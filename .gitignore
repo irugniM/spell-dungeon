@@ -1,0 +1,17 @@
+﻿# Dependencies and secrets
+node_modules/
+.env
+.env.*
+
+# Cloudflare / Netlify local state
+.wrangler/
+.netlify/
+
+# Logs and local probes
+*.log
+_tunnel.log
+webgame_probe.txt
+
+# OS
+.DS_Store
+Thumbs.db
