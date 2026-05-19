@@ -19,25 +19,26 @@ project root you can also use the launchers:
 A static server works equally well: `npx serve .` or any GitHub Pages
 deploy will run the site as-is.
 
-## Default account
+## Sign in
 
-A single Admin account is seeded the first time the page loads:
+Arcade-style login — no password. On first load, enter a **player name**
+(1–16 characters) and click **Play**:
 
-```
-Username: Admin
-Password: cs2212
-```
+- **New name** — auto-registers as a `Player` and opens the home screen.
+- **Returning name** — restores that player’s stats, coins, and save slots
+  from `localStorage` (nothing leaves the device).
 
-You can register additional `Player` accounts from the login screen.
-Passwords are hashed with SHA-256 in the browser before being written
-into `localStorage`; nothing leaves the device.
+A default **Admin** account is seeded the first time the page loads. Type
+`Admin` on the login screen to open the admin panel (manage users, wipe
+data, reset the leaderboard). Register and password-recovery routes in the
+app redirect to this same name-entry screen.
 
 ## Feature parity with the Java original
 
 | Feature                                            | Web port |
 | -------------------------------------------------- | -------- |
-| Login / register / forgotten-password reset        | Yes      |
-| Default seeded admin account                       | Yes      |
+| Name-only login / auto-register (no password)      | Yes      |
+| Default seeded Admin name (`Admin`)                | Yes      |
 | Player home screen with stats summary              | Yes      |
 | 4 save slots per account (load / new game)         | Yes      |
 | Auto-save on level advance                         | Yes      |
@@ -100,10 +101,10 @@ webgame/
 ├── README.md
 └── js/
     ├── app.js           # Boot & session restore
-    ├── storage.js       # Accounts (SHA-256), players, slots, stats, sessions
+    ├── storage.js       # Accounts, players, slots, stats, sessions
     ├── leaderboard.js   # Personal-best leaderboard
     ├── sentences.js     # Sentence bank for the spell-casting minigame
-    ├── screens.js       # Login / register / home / slots / stats / admin / tutorial
+    ├── screens.js       # Name login / home / slots / stats / admin / tutorial
     └── game.js          # Gameplay loop, HUD, hotbar, inventory, spellcast
 ```
 
@@ -112,8 +113,9 @@ webgame/
 - Pure vanilla JS, ES5+. Runs offline from `file://`.
 - Persistence is `localStorage`-only — no network calls, no analytics,
   no third-party assets.
-- Password storage uses `crypto.subtle.digest("SHA-256", …)`; the
-  hashing is async but the entire UI remains synchronous after login.
+- Sign-in is name-only (`signInOrCreate` in `storage.js`); legacy account
+  records may still carry optional password hashes, but the UI never asks
+  for a password.
 - The leaderboard logic mirrors the deduplication-by-personal-best fix
   that was applied to the Java `DataManager`, so each account always has
   exactly one leaderboard entry containing their best score.
