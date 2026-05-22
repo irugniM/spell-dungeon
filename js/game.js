@@ -129,29 +129,40 @@
     function drawDamageIndicator(ctx, state) {
         var p = state.player;
         if (!p) return;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
         if (p.hurtFlash > 0) {
             var ha = clamp(p.hurtFlash / 0.1, 0, 1) * 0.35;
             ctx.fillStyle = "rgba(255, 93, 108, " + ha + ")";
             ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+            for (var hx = 0; hx < VIEW_W; hx += PX * 4) {
+                ctx.globalAlpha = ha * 0.4;
+                drawRect(ctx, hx, 0, PX * 2, VIEW_H, "#ff2244");
+            }
+            ctx.globalAlpha = 1;
         }
         var ind = state.damageIndicator;
-        if (!ind || ind.life <= 0) return;
+        if (!ind || ind.life <= 0) {
+            ctx.restore();
+            return;
+        }
         var angle = ind.angle;
         var alpha = clamp(ind.life / 1.15, 0, 1) * 0.88;
         var cx = VIEW_W * 0.5;
         var cy = VIEW_H * 0.5;
-        var ex = cx + Math.cos(angle) * (VIEW_W * 0.47);
-        var ey = cy + Math.sin(angle) * (VIEW_H * 0.47);
-        ctx.save();
+        var segments = 10;
+        var radius = Math.min(VIEW_W, VIEW_H) * 0.47;
         ctx.globalAlpha = alpha;
-        ctx.strokeStyle = "#ff3d55";
-        ctx.shadowColor = "#ff2244";
-        ctx.shadowBlur = 18;
-        ctx.lineWidth = 14;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.arc(ex, ey, 32, angle + Math.PI * 0.52, angle + Math.PI * 1.48);
-        ctx.stroke();
+        for (var si = 0; si < segments; si++) {
+            var a0 = angle + Math.PI * 0.52 + (si / segments) * Math.PI * 0.96;
+            var a1 = a0 + Math.PI * 0.96 / segments;
+            var x0 = Math.round(cx + Math.cos(a0) * radius);
+            var y0 = Math.round(cy + Math.sin(a0) * radius);
+            var x1 = Math.round(cx + Math.cos(a1) * radius);
+            var y1 = Math.round(cy + Math.sin(a1) * radius);
+            drawRect(ctx, x0 - PX, y0 - PX, PX * 3, PX * 3, "#ff3d55");
+            drawRect(ctx, x1 - PX, y1 - PX, PX * 2, PX * 2, "#ff2244");
+        }
         ctx.restore();
     }
 
@@ -287,17 +298,16 @@
     }
 
     function drawParticles(ctx, state) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
         for (var i = 0; i < state.particles.length; i++) {
             var pt = state.particles[i];
             var alpha = clamp(pt.life / pt.maxLife, 0, 1);
-            ctx.save();
             ctx.globalAlpha = alpha;
-            ctx.fillStyle = pt.color;
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+            var sz = Math.max(PX, Math.round(pt.size / PX) * PX);
+            drawRect(ctx, Math.round(pt.x) - sz / 2, Math.round(pt.y) - sz / 2, sz, sz, pt.color);
         }
+        ctx.restore();
     }
 
     function triggerSpellSuccessFlash(state) {
@@ -1446,17 +1456,21 @@
         if (!state.map || !state.map.traps) return;
         var pr = roomContaining(state.map, state.player.x, state.player.y);
         var pulse = 0.55 + 0.45 * Math.sin((state.animTime || 0) * 6);
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
         for (var i = 0; i < state.map.traps.length; i++) {
             var tr = state.map.traps[i];
             if (pr && tr.roomIndex !== pr.index) continue;
-            ctx.save();
-            ctx.fillStyle = "rgba(200, 40, 50, " + (0.22 + pulse * 0.18) + ")";
-            ctx.fillRect(tr.x, tr.y, tr.w, tr.h);
-            ctx.strokeStyle = "rgba(255, 90, 70, " + (0.45 + pulse * 0.25) + ")";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(tr.x + 1, tr.y + 1, tr.w - 2, tr.h - 2);
-            ctx.restore();
+            ctx.globalAlpha = 0.22 + pulse * 0.18;
+            drawRect(ctx, tr.x, tr.y, tr.w, tr.h, "#8c1828");
+            ctx.globalAlpha = 0.45 + pulse * 0.25;
+            for (var sx = tr.x + PX; sx < tr.x + tr.w - PX; sx += PX * 3) {
+                for (var sy = tr.y + PX; sy < tr.y + tr.h - PX; sy += PX * 3) {
+                    drawRect(ctx, sx, sy, PX, PX * 2, pulse > 0.75 ? "#ff5d6c" : "#5c1018");
+                }
+            }
         }
+        ctx.restore();
     }
 
     function updateRoomsCleared(state) {
@@ -1546,42 +1560,143 @@
     }
 
     /* ============================================================ *
-     *  Drawing
+     *  Drawing — pixel art (PX-unit sprites, no smoothing)
      * ============================================================ */
-    function drawRect(ctx, x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); }
+    var PX = 2;
 
-    function drawRoomFloor(ctx, room, isStart, isBoss) {
-        var base = isStart ? "#0e1a2c" : isBoss ? "#1c0d18" : "#0e162a";
-        drawRect(ctx, room.x, room.y, room.w, room.h, base);
+    var PIXEL_PAL = {
+        void: "#050811",
+        stone: "#1a2844",
+        stoneHi: "#243656",
+        stoneLo: "#0f1828",
+        mortar: "#0c1424",
+        wood: "#4a2e18",
+        woodHi: "#6b4426",
+        woodLo: "#2a1810",
+        gold: "#ffd166",
+        goldHi: "#fff3b0",
+        goldLo: "#b8922e",
+        slime: "#6cf2a6",
+        slimeHi: "#9dffd0",
+        slimeLo: "#2a7a52",
+        fire: "#ff8a3d",
+        fireHi: "#ffd166",
+        fireCore: "#fff8e8",
+        shadow: "rgba(0,0,0,0.45)",
+        hp: "#ff5d6c",
+        hpBg: "#1a0a0a",
+        mp: "#6ec1ff",
+        white: "#e8eef8",
+        black: "#06080f",
+    };
+
+    function drawRect(ctx, x, y, w, h, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+    }
+
+    function px(ctx, x, y, color) {
+        if (!color) return;
+        drawRect(ctx, x, y, PX, PX, color);
+    }
+
+    function blitSprite(ctx, cx, cy, rows, palette, scale, flipX) {
+        scale = scale || PX;
+        var h = rows.length;
+        var w = rows[0].length;
+        var ox = Math.round(cx - (w * scale) / 2);
+        var oy = Math.round(cy - (h * scale) / 2);
+        for (var r = 0; r < h; r++) {
+            var row = rows[r];
+            for (var c = 0; c < row.length; c++) {
+                var ch = row[c];
+                if (ch === "." || ch === " ") continue;
+                var col = palette[ch];
+                if (!col) continue;
+                var dx = flipX ? ox + (w - 1 - c) * scale : ox + c * scale;
+                drawRect(ctx, dx, oy + r * scale, scale, scale, col);
+            }
+        }
+    }
+
+    function drawDitherTile(ctx, x, y, c1, c2, seed) {
+        drawRect(ctx, x, y, TILE, TILE, (seed & 1) ? c1 : c2);
         ctx.save();
-        ctx.globalAlpha = 0.18;
-        var checker1 = isBoss ? "#280d1f" : "#152540";
-        var checker2 = isBoss ? "#1a0916" : "#0d1731";
-        for (var ty = 0; ty < room.h / TILE; ty++) {
-            for (var tx = 0; tx < room.w / TILE; tx++) {
-                ctx.fillStyle = (ty + tx) % 2 === 0 ? checker1 : checker2;
-                ctx.fillRect(room.x + tx * TILE, room.y + ty * TILE, TILE, TILE);
+        ctx.globalAlpha = 0.35;
+        for (var py = 0; py < TILE; py += PX) {
+            for (var pxX = 0; pxX < TILE; pxX += PX) {
+                if (((pxX + py + seed) >> 2) % 2 === 0) {
+                    drawRect(ctx, x + pxX, y + py, PX, PX, c2);
+                }
             }
         }
         ctx.restore();
-        ctx.strokeStyle = isBoss ? "#3b1430" : isStart ? "#1d3457" : "#1a2a4a";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(room.x + 2, room.y + 2, room.w - 4, room.h - 4);
+    }
+
+    function drawBrickBorder(ctx, x, y, w, h, accent) {
+        drawRect(ctx, x, y, w, PX, accent);
+        drawRect(ctx, x, y, PX, h, accent);
+        drawRect(ctx, x + w - PX, y, PX, h, PIXEL_PAL.stoneLo);
+        drawRect(ctx, x, y + h - PX, w, PX, PIXEL_PAL.stoneLo);
+    }
+
+    function drawRoomFloor(ctx, room, isStart, isBoss) {
+        var base = isStart ? "#0e1a2c" : isBoss ? "#1c0d18" : "#0e162a";
+        var c1 = isBoss ? "#280d1f" : isStart ? "#152540" : "#131f38";
+        var c2 = isBoss ? "#1a0916" : isStart ? "#0d1731" : "#0c1528";
+        var accent = isBoss ? "#5c1a38" : isStart ? "#2a4a72" : "#243a5c";
+        drawRect(ctx, room.x, room.y, room.w, room.h, base);
+        var tilesX = Math.floor(room.w / TILE);
+        var tilesY = Math.floor(room.h / TILE);
+        for (var ty = 0; ty < tilesY; ty++) {
+            for (var tx = 0; tx < tilesX; tx++) {
+                var seed = tx + ty * 3 + (isBoss ? 7 : isStart ? 2 : 0);
+                drawDitherTile(ctx, room.x + tx * TILE, room.y + ty * TILE, c1, c2, seed);
+                if ((tx + ty) % 5 === 0 && !isBoss) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.12;
+                    drawRect(ctx, room.x + tx * TILE + 8, room.y + ty * TILE + 8, PX * 2, PX * 2, "#6a7a9a");
+                    ctx.restore();
+                }
+            }
+        }
+        drawBrickBorder(ctx, room.x + 2, room.y + 2, room.w - 4, room.h - 4, accent);
         if (isBoss) {
+            var cx = Math.round(room.x + room.w / 2);
+            var cy = Math.round(room.y + room.h / 2);
             ctx.save();
-            ctx.fillStyle = "#3a0e22";
-            ctx.beginPath();
-            ctx.arc(room.x + room.w / 2, room.y + room.h / 2, 110, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.globalAlpha = 0.22;
+            for (var ring = 0; ring < 14; ring++) {
+                var rr = 90 - ring * 6;
+                if (rr <= 0) break;
+                drawRect(ctx, cx - rr, cy - rr, rr * 2, rr * 2, ring % 2 ? "#4a1028" : "#2a0818");
+            }
             ctx.restore();
+            for (var rune = 0; rune < 8; rune++) {
+                var ang = (rune / 8) * Math.PI * 2;
+                px(ctx, cx + Math.round(Math.cos(ang) * 72) - PX, cy + Math.round(Math.sin(ang) * 72) - PX, "#ff5d6c");
+            }
         }
     }
 
     function drawCorridor(ctx, corridor) {
-        drawRect(ctx, corridor.x, corridor.y, corridor.w, corridor.h, "#0c142a");
-        ctx.strokeStyle = "#1a2a4a";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(corridor.x + 2, corridor.y + 2, corridor.w - 4, corridor.h - 4);
+        drawRect(ctx, corridor.x, corridor.y, corridor.w, corridor.h, PIXEL_PAL.mortar);
+        var tilesX = Math.max(1, Math.floor(corridor.w / TILE));
+        var tilesY = Math.max(1, Math.floor(corridor.h / TILE));
+        for (var ty = 0; ty < tilesY; ty++) {
+            for (var tx = 0; tx < tilesX; tx++) {
+                var seed = tx * 2 + ty + corridor.x + corridor.y;
+                drawDitherTile(
+                    ctx,
+                    corridor.x + tx * TILE,
+                    corridor.y + ty * TILE,
+                    "#121e34",
+                    "#0e172c",
+                    seed
+                );
+            }
+        }
+        drawBrickBorder(ctx, corridor.x + 2, corridor.y + 2, corridor.w - 4, corridor.h - 4, "#1e3050");
     }
 
     /**
@@ -1617,237 +1732,322 @@
 
     function drawDoor(ctx, door) {
         ctx.save();
+        ctx.imageSmoothingEnabled = false;
         if (door.open) {
-            ctx.fillStyle = "#0c142a";
-            ctx.fillRect(door.x, door.y, door.w, door.h);
+            drawRect(ctx, door.x, door.y, door.w, door.h, PIXEL_PAL.mortar);
             if (door.flashTimer > 0) {
                 var fa = clamp(door.flashTimer / 0.45, 0, 1) * 0.85;
-                ctx.fillStyle = "rgba(255, 209, 102, " + fa + ")";
-                ctx.fillRect(door.x, door.y, door.w, door.h);
+                ctx.globalAlpha = fa;
+                for (var fy = door.y; fy < door.y + door.h; fy += PX * 2) {
+                    for (var fx = door.x; fx < door.x + door.w; fx += PX * 2) {
+                        px(ctx, fx, fy, PIXEL_PAL.gold);
+                    }
+                }
             }
             ctx.restore();
             return;
         }
-        ctx.fillStyle = "#3b2412";
-        ctx.fillRect(door.x, door.y, door.w, door.h);
-        ctx.strokeStyle = "#0c0a08";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(door.x + 1, door.y + 1, door.w - 2, door.h - 2);
-        // Keyhole: vertical bar for H doors, horizontal bar for V doors
-        ctx.fillStyle = "#ffd166";
-        var cx = door.x + door.w / 2, cy = door.y + door.h / 2;
-        if (!door.dir || door.dir === 'h') {
-            ctx.fillRect(cx - 1, cy - 4, 2, 8);
+        drawRect(ctx, door.x, door.y, door.w, door.h, PIXEL_PAL.woodLo);
+        var plankStep = PX * 3;
+        for (var py = door.y + PX; py < door.y + door.h - PX; py += plankStep) {
+            drawRect(ctx, door.x + PX, py, door.w - PX * 2, PX, PIXEL_PAL.wood);
+            drawRect(ctx, door.x + PX, py + PX, door.w - PX * 2, PX, PIXEL_PAL.woodHi);
+        }
+        drawRect(ctx, door.x, door.y, door.w, PX, PIXEL_PAL.woodHi);
+        drawRect(ctx, door.x, door.y + door.h - PX, door.w, PX, PIXEL_PAL.woodLo);
+        var cx = Math.round(door.x + door.w / 2);
+        var cy = Math.round(door.y + door.h / 2);
+        drawRect(ctx, cx - PX, cy - PX, PX * 2, PX * 2, PIXEL_PAL.goldLo);
+        drawRect(ctx, cx - PX / 2, cy - PX * 2, PX, PX * 4, PIXEL_PAL.gold);
+        if (!door.dir || door.dir === "h") {
+            drawRect(ctx, cx - PX / 2, cy + PX, PX, PX * 2, PIXEL_PAL.black);
         } else {
-            ctx.fillRect(cx - 4, cy - 1, 8, 2);
+            drawRect(ctx, cx + PX, cy - PX / 2, PX * 2, PX, PIXEL_PAL.black);
         }
         ctx.restore();
     }
 
+    var PLAYER_SPRITE = [
+        ".....HHHHH.....",
+        "....HHHHHHH....",
+        "...RRRRRRRRR...",
+        "..RRRRaaaRRRR..",
+        ".RRRRaaaaRRRRR.",
+        ".RRRbbFFbbRRR..",
+        "..bbFFFFFFbb...",
+        "...LL....LL....",
+        "....LL..LL.....",
+    ];
+
     function drawPlayer(ctx, p) {
-        var x = p.x, y = p.y;
+        var x = Math.round(p.x);
+        var y = Math.round(p.y);
+        var bob = Math.round(Math.sin(performance.now() * 0.006 + x * 0.05) * PX);
+        y += bob;
         var bodyColor = p.tintColor || "#6cf2a6";
+        var accent = shadeColor(bodyColor, -40);
+        var dark = shadeColor(bodyColor, -70);
+        var palette = {
+            H: "#2a1a4a",
+            R: bodyColor,
+            a: accent,
+            b: "#e8c9a0",
+            F: PIXEL_PAL.white,
+            L: dark,
+        };
         ctx.save();
-        if (p.dashIFrameTimer > 0) { ctx.shadowColor = "#6ec1ff"; ctx.shadowBlur = 20; }
-        else if (p.invincibleTimer > 0) { ctx.shadowColor = "#b29bff"; ctx.shadowBlur = 18; }
-        else if (p.strengthTimer > 0) { ctx.shadowColor = "#ffb46b"; ctx.shadowBlur = 14; }
-        ctx.fillStyle = "#0c1326";
-        ctx.beginPath(); ctx.arc(x, y + 6, PLAYER_RADIUS + 2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = bodyColor;
-        ctx.beginPath(); ctx.arc(x, y, PLAYER_RADIUS, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#0b0f1a";
-        ctx.beginPath(); ctx.arc(x, y, PLAYER_RADIUS - 3, 0, Math.PI * 2); ctx.fill();
-        var fx = p.faceX, fy = p.faceY;
-        var len = Math.sqrt(fx * fx + fy * fy) || 1;
-        ctx.fillStyle = "#fff";
-        ctx.beginPath(); ctx.arc(x + (fx / len) * 4, y + (fy / len) * 4, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.imageSmoothingEnabled = false;
+        drawRect(ctx, x - PLAYER_RADIUS - 2, y + 8, (PLAYER_RADIUS + 2) * 2, PX * 2, PIXEL_PAL.shadow);
+        if (p.dashIFrameTimer > 0) {
+            ctx.globalAlpha = 0.35;
+            for (var di = -2; di <= 2; di++) {
+                blitSprite(ctx, x - di * PX * 3, y, PLAYER_SPRITE, palette, PX, di < 0);
+            }
+            ctx.globalAlpha = 1;
+        }
+        if (p.invincibleTimer > 0) {
+            ctx.globalAlpha = 0.5 + 0.5 * Math.sin(Date.now() * 0.02);
+            drawRect(ctx, x - PLAYER_RADIUS - 4, y - PLAYER_RADIUS - 4, (PLAYER_RADIUS + 4) * 2, (PLAYER_RADIUS + 4) * 2, "#b29bff");
+            ctx.globalAlpha = 1;
+        }
+        if (p.strengthTimer > 0) {
+            px(ctx, x - PLAYER_RADIUS - 6, y - 4, PIXEL_PAL.gold);
+            px(ctx, x + PLAYER_RADIUS + 2, y - 4, PIXEL_PAL.gold);
+        }
+        var fx = p.faceX;
+        var flipX = fx < 0;
+        blitSprite(ctx, x, y, PLAYER_SPRITE, palette, PX, flipX);
+        var len = Math.sqrt(p.faceX * p.faceX + p.faceY * p.faceY) || 1;
+        var sx = Math.round(x + (p.faceX / len) * 10);
+        var sy = Math.round(y + (p.faceY / len) * 10);
+        drawRect(ctx, sx - PX, sy - PX, PX * 2, PX * 2, PIXEL_PAL.goldHi);
+        drawRect(ctx, sx, sy - PX * 2, PX, PX * 4, PIXEL_PAL.gold);
         ctx.restore();
     }
 
+    function shadeColor(hex, amount) {
+        var n = parseInt(hex.slice(1), 16);
+        var r = clamp(((n >> 16) & 255) + amount, 0, 255);
+        var g = clamp(((n >> 8) & 255) + amount, 0, 255);
+        var b = clamp((n & 255) + amount, 0, 255);
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
+    var ENEMY_SPRITES = {
+        grunt: [
+            "....OOOO....",
+            "...OOOOOO...",
+            "..OOOOOOOO..",
+            ".OOooDDooOO.",
+            ".OOooDDooOO.",
+            "..OOOOOOOO..",
+            "...ssssss...",
+        ],
+        fast: [
+            "...GGGG.....",
+            "..GGGGGG....",
+            ".GGggggGG...",
+            "GGggFFggGG..",
+            ".GGggggGG...",
+            "..GG..GG....",
+            "...ss.ss....",
+        ],
+        tank: [
+            "..BBBBBB....",
+            ".BBBBBBBB...",
+            "BBBBMMMBBBB.",
+            "BBBMMMMMBBB.",
+            "BBBBMMMBBBB.",
+            ".BBBBBBBB...",
+            "..BBBBBB....",
+        ],
+        ranged: [
+            "....PPPP....",
+            "...PPPPPP...",
+            "..PPwwwwPP..",
+            ".PPwwFFwwPP.",
+            "..PPPPPPPP..",
+            "...PP..PP...",
+            "....ssss....",
+        ],
+        archer: [
+            "....OOOO....",
+            "...OOOOOO...",
+            "..OOwwwwOO..",
+            ".OOwwFFwwOO.",
+            "..OOOOOOOO..",
+            "...OO..OO...",
+            "..ss....ss..",
+        ],
+        boss: [
+            "...RRRRRR...",
+            "..RRRRRRRR..",
+            ".RRRRRRRRRR.",
+            "RRRRMMMMRRRR",
+            "RRRRMMMMRRRR",
+            ".RRRRRRRRRR.",
+            "..RRssssRR..",
+        ],
+    };
+
+    function enemySpritePalette(e, c1, c2) {
+        return {
+            O: c1,
+            o: c2,
+            G: c1,
+            g: c2,
+            B: c1,
+            M: c2,
+            P: c1,
+            w: c2,
+            R: c1,
+            s: PIXEL_PAL.shadow,
+            D: PIXEL_PAL.black,
+            F: PIXEL_PAL.white,
+        };
+    }
+
     function drawEnemy(ctx, e, animTime) {
+        var ex = Math.round(e.x);
+        var ey = Math.round(e.y);
+        var bob = Math.round(Math.sin((animTime || 0) * 5 + ex * 0.03) * PX);
+        ey += bob;
         if (e.isBoss && e.maxHp > 0 && e.hp / e.maxHp < 0.5) {
             var bp = 0.5 + 0.5 * Math.sin((animTime || 0) * 9);
             ctx.save();
-            ctx.strokeStyle = "rgba(255, 50, 70, " + (0.4 + bp * 0.35) + ")";
-            ctx.lineWidth = 3;
-            ctx.shadowColor = "#ff2244";
-            ctx.shadowBlur = 14;
-            ctx.beginPath();
-            ctx.arc(e.x, e.y, e.radius + 12 + bp * 4, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.globalAlpha = 0.35 + bp * 0.25;
+            for (var ring = 0; ring < 4; ring++) {
+                var side = e.radius + 10 + ring * PX * 2;
+                drawRect(ctx, ex - side, ey - side, side * 2, side * 2, ring % 2 ? "#ff2244" : "#7a1c2a");
+            }
             ctx.restore();
         }
         if (e.attackWindup > 0) {
             var tp = clamp(e.attackWindup / ENEMY_TELEGRAPH, 0, 1);
             ctx.save();
-            ctx.strokeStyle = "rgba(255, 93, 108, " + (0.35 + tp * 0.45) + ")";
-            ctx.lineWidth = 2 + tp * 2;
-            ctx.beginPath();
-            ctx.arc(e.x, e.y, e.radius + 6 + tp * 8, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.globalAlpha = 0.4 + tp * 0.45;
+            drawRect(ctx, ex - e.radius - 8 - tp * 8, ey - e.radius - 8 - tp * 8, (e.radius + 8 + tp * 8) * 2, (e.radius + 8 + tp * 8) * 2, "#ff5d6c");
             ctx.restore();
         }
         var c1 = e.isBoss ? "#ff5d6c" : e.archetype === "fast" ? "#6cf2a6" : e.archetype === "tank" ? "#b29bff" : e.archetype === "archer" ? "#ff8a3d" : e.archetype === "ranged" ? "#ff66aa" : "#ff8a3d";
         var c2 = e.isBoss ? "#7a1c2a" : e.archetype === "fast" ? "#1a4a30" : e.archetype === "tank" ? "#3a2860" : e.archetype === "archer" ? "#4a2110" : e.archetype === "ranged" ? "#5c1a40" : "#4a2110";
+        var spriteKey = e.isBoss ? "boss" : e.archetype === "fast" ? "fast" : e.archetype === "tank" ? "tank" : e.archetype === "archer" ? "archer" : e.archetype === "ranged" ? "ranged" : "grunt";
+        var rows = ENEMY_SPRITES[spriteKey] || ENEMY_SPRITES.grunt;
+        var scale = e.isBoss ? PX + 1 : PX;
         ctx.save();
-        ctx.fillStyle = "rgba(0,0,0,0.4)";
-        ctx.beginPath(); ctx.arc(e.x, e.y + 6, e.radius + 2, 0, Math.PI * 2); ctx.fill();
-        if (e.archetype === "ranged" || e.archetype === "archer") {
-            ctx.fillStyle = c1;
-            ctx.beginPath();
-            ctx.moveTo(e.x, e.y - e.radius);
-            ctx.lineTo(e.x + e.radius, e.y + e.radius * 0.6);
-            ctx.lineTo(e.x - e.radius, e.y + e.radius * 0.6);
-            ctx.closePath();
-            ctx.fill();
-            ctx.fillStyle = c2;
-            ctx.beginPath();
-            ctx.moveTo(e.x, e.y - e.radius + 5);
-            ctx.lineTo(e.x + e.radius - 5, e.y + e.radius * 0.45);
-            ctx.lineTo(e.x - e.radius + 5, e.y + e.radius * 0.45);
-            ctx.closePath();
-            ctx.fill();
-        } else if (e.archetype === "tank") {
-            ctx.fillStyle = c1;
-            ctx.fillRect(e.x - e.radius, e.y - e.radius, e.radius * 2, e.radius * 2);
-            ctx.fillStyle = c2;
-            ctx.fillRect(e.x - e.radius + 4, e.y - e.radius + 4, e.radius * 2 - 8, e.radius * 2 - 8);
-        } else if (e.archetype === "fast") {
-            ctx.fillStyle = c1;
-            ctx.beginPath();
-            ctx.ellipse(e.x, e.y, e.radius * 0.75, e.radius, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = c2;
-            ctx.beginPath();
-            ctx.ellipse(e.x, e.y, e.radius * 0.55, e.radius - 4, 0, 0, Math.PI * 2);
-            ctx.fill();
-        } else {
-            ctx.fillStyle = c1;
-            ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = c2;
-            ctx.beginPath(); ctx.arc(e.x, e.y, e.radius - 4, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(e.x - 5, e.y - 3, 3, 3); ctx.fillRect(e.x + 2, e.y - 3, 3, 3);
-        ctx.fillStyle = "#000";
-        ctx.fillRect(e.x - 4, e.y - 2, 1, 1); ctx.fillRect(e.x + 3, e.y - 2, 1, 1);
+        ctx.imageSmoothingEnabled = false;
+        drawRect(ctx, ex - e.radius - 2, ey + 6, (e.radius + 2) * 2, PX * 2, PIXEL_PAL.shadow);
+        blitSprite(ctx, ex, ey, rows, enemySpritePalette(e, c1, c2), scale, false);
         if (e.isElite) {
-            ctx.strokeStyle = "#ffd166";
-            ctx.lineWidth = 3;
-            ctx.shadowColor = "#ffd166";
-            ctx.shadowBlur = 10;
-            ctx.beginPath();
-            ctx.arc(e.x, e.y, e.radius + 5, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 0.85;
+            drawRect(ctx, ex - e.radius - 6, ey - e.radius - 6, (e.radius + 6) * 2, PX, PIXEL_PAL.gold);
+            drawRect(ctx, ex - e.radius - 6, ey + e.radius + 2, (e.radius + 6) * 2, PX, PIXEL_PAL.gold);
+            drawRect(ctx, ex - e.radius - 6, ey - e.radius - 6, PX, (e.radius + 6) * 2, PIXEL_PAL.gold);
+            drawRect(ctx, ex + e.radius + 2, ey - e.radius - 6, PX, (e.radius + 6) * 2, PIXEL_PAL.gold);
         }
         if (e.hitFlash > 0) {
-            ctx.globalAlpha = clamp(e.hitFlash / 0.12, 0, 1) * 0.85;
-            ctx.fillStyle = "#fff";
-            ctx.beginPath();
-            ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.globalAlpha = clamp(e.hitFlash / 0.12, 0, 1) * 0.9;
+            blitSprite(ctx, ex, ey, rows, { O: "#fff", o: "#fff", G: "#fff", g: "#fff", B: "#fff", M: "#fff", P: "#fff", w: "#fff", R: "#fff", s: "#fff", D: "#fff", F: "#fff" }, scale, false);
         }
         ctx.restore();
 
         var w = e.isBoss ? 80 : 50;
         var pct = clamp(e.hp / e.maxHp, 0, 1);
+        var barY = ey - e.radius - 12;
         ctx.save();
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(e.x - w / 2 - 1, e.y - e.radius - 11, w + 2, 6);
-        ctx.fillStyle = "#1a0a0a";
-        ctx.fillRect(e.x - w / 2, e.y - e.radius - 10, w, 4);
-        ctx.fillStyle = e.isBoss ? "#ff5d6c" : "#ffd166";
-        ctx.fillRect(e.x - w / 2, e.y - e.radius - 10, w * pct, 4);
+        ctx.imageSmoothingEnabled = false;
+        drawRect(ctx, ex - w / 2 - PX, barY - PX, w + PX * 2, PX * 3, PIXEL_PAL.black);
+        drawRect(ctx, ex - w / 2, barY, w, PX * 2, PIXEL_PAL.hpBg);
+        drawRect(ctx, ex - w / 2, barY, Math.round(w * pct), PX * 2, e.isBoss ? PIXEL_PAL.hp : PIXEL_PAL.gold);
         ctx.restore();
     }
 
     function drawFireball(ctx, f) {
         var trail = f.trail || [];
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
         for (var ti = 0; ti < trail.length - 1; ti++) {
             var tp = trail[ti];
             var fade = (ti + 1) / trail.length * 0.45;
-            ctx.save();
             ctx.globalAlpha = fade;
-            ctx.fillStyle = f.charged ? "#fff3b0" : "#ff8a3d";
-            ctx.beginPath();
-            ctx.arc(tp.x, tp.y, FIREBALL_RADIUS - 2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+            px(ctx, Math.round(tp.x) - PX, Math.round(tp.y) - PX, f.charged ? PIXEL_PAL.goldHi : PIXEL_PAL.fire);
+            px(ctx, Math.round(tp.x), Math.round(tp.y), f.charged ? PIXEL_PAL.fireHi : PIXEL_PAL.fire);
         }
-        ctx.save();
-        ctx.shadowColor = f.charged ? "#ffe066" : "#ff8a3d";
-        ctx.shadowBlur = f.charged ? 22 : 16;
-        ctx.fillStyle = f.charged ? "#fff3b0" : "#ffd166";
-        ctx.beginPath(); ctx.arc(f.x, f.y, f.charged ? FIREBALL_RADIUS + 2 : FIREBALL_RADIUS, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = f.charged ? "#fff" : "#fff3b0";
-        ctx.beginPath(); ctx.arc(f.x - f.vx * 0.005, f.y - f.vy * 0.005, FIREBALL_RADIUS - 3, 0, Math.PI * 2); ctx.fill();
+        var fx = Math.round(f.x);
+        var fy = Math.round(f.y);
+        var core = f.charged ? PIXEL_PAL.fireCore : PIXEL_PAL.fireHi;
+        var outer = f.charged ? PIXEL_PAL.goldHi : PIXEL_PAL.fire;
+        ctx.globalAlpha = 1;
+        drawRect(ctx, fx - PX * 2, fy - PX * 2, PX * 4, PX * 4, outer);
+        drawRect(ctx, fx - PX, fy - PX, PX * 2, PX * 2, core);
+        px(ctx, fx - Math.round(f.vx * 0.008) - PX, fy - Math.round(f.vy * 0.008), PIXEL_PAL.white);
+        if (f.charged) {
+            px(ctx, fx + PX * 2, fy, PIXEL_PAL.gold);
+            px(ctx, fx - PX * 2, fy, PIXEL_PAL.gold);
+            px(ctx, fx, fy - PX * 2, PIXEL_PAL.gold);
+            px(ctx, fx, fy + PX * 2, PIXEL_PAL.gold);
+        }
         ctx.restore();
     }
 
     function drawShrine(ctx, s, animTime) {
         if (s.used) return;
-        var bob = Math.sin((animTime || 0) * 3.2 + s.x * 0.01) * 4;
-        var y = s.y + bob;
+        var bob = Math.round(Math.sin((animTime || 0) * 3.2 + s.x * 0.01) * PX * 2);
+        var sx = Math.round(s.x);
+        var sy = Math.round(s.y) + bob;
         ctx.save();
-        ctx.shadowColor = "#ffd166";
-        ctx.shadowBlur = 14 + Math.sin((animTime || 0) * 4) * 4;
-        ctx.fillStyle = "#3a3018";
-        ctx.fillRect(s.x - 12, y - 4, 24, 18);
-        ctx.fillStyle = "#ffd166";
-        ctx.beginPath();
-        ctx.moveTo(s.x, y - 22);
-        ctx.lineTo(s.x + 14, y - 2);
-        ctx.lineTo(s.x - 14, y - 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = "rgba(255, 243, 176, 0.85)";
-        ctx.beginPath();
-        ctx.arc(s.x, y - 10, 5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.imageSmoothingEnabled = false;
+        drawRect(ctx, sx - 14, sy + 2, 28, 16, PIXEL_PAL.stoneLo);
+        drawRect(ctx, sx - 12, sy, 24, PX * 2, PIXEL_PAL.stone);
+        for (var col = -2; col <= 2; col++) {
+            px(ctx, sx + col * PX * 3, sy - PX * 6, PIXEL_PAL.gold);
+        }
+        drawRect(ctx, sx - PX, sy - PX * 8, PX * 2, PX * 2, PIXEL_PAL.goldHi);
+        var glow = 0.55 + 0.45 * Math.sin((animTime || 0) * 4);
+        ctx.globalAlpha = glow;
+        px(ctx, sx - PX * 5, sy - PX * 4, PIXEL_PAL.goldHi);
+        px(ctx, sx + PX * 4, sy - PX * 3, PIXEL_PAL.goldHi);
         ctx.restore();
     }
 
     function drawTreasure(ctx, t, animTime) {
         if (t.opened && (!t.openAnim || t.openAnim >= 1)) return;
         var color = t.type === "Health" ? "#6cf2a6" : t.type === "Strength" ? "#ffb46b" : t.type === "ScoreCache" ? "#ffd166" : "#b29bff";
-        var bob = Math.sin((animTime || 0) * 4.5 + t.x * 0.02) * 3;
-        var y = t.y + bob;
-        var lidLift = t.openAnim ? t.openAnim * 14 : 0;
+        var colorLo = shadeColor(color, -45);
+        var bob = Math.round(Math.sin((animTime || 0) * 4.5 + t.x * 0.02) * PX * 2);
+        var tx = Math.round(t.x);
+        var ty = Math.round(t.y) + bob;
+        var lidLift = t.openAnim ? Math.round(t.openAnim * 14) : 0;
         ctx.save();
+        ctx.imageSmoothingEnabled = false;
         ctx.globalAlpha = t.openAnim ? 1 - t.openAnim * 0.9 : 1;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 10 + Math.sin((animTime || 0) * 5) * 3;
-        ctx.fillStyle = "#3b2412";
-        ctx.fillRect(t.x - 14, y - 6 + lidLift * 0.2, 28, 16);
-        ctx.fillStyle = color;
-        ctx.fillRect(t.x - 12, y - 4 + lidLift * 0.2, 24, 12);
-        ctx.fillStyle = "#2a1810";
-        ctx.fillRect(t.x - 14, y - 10 - lidLift, 28, 8);
-        ctx.fillStyle = color;
-        ctx.globalAlpha *= 0.85;
-        ctx.fillRect(t.x - 12, y - 9 - lidLift, 24, 5);
+        drawRect(ctx, tx - 14, ty + 2 + Math.round(lidLift * 0.15), 28, 14, PIXEL_PAL.woodLo);
+        drawRect(ctx, tx - 12, ty + 4 + Math.round(lidLift * 0.15), 24, 10, colorLo);
+        drawRect(ctx, tx - 2, ty + 6, PX * 2, PX * 2, PIXEL_PAL.gold);
+        drawRect(ctx, tx - 14, ty - 8 - lidLift, 28, 8, PIXEL_PAL.wood);
+        drawRect(ctx, tx - 12, ty - 10 - lidLift, 24, 6, color);
+        if (!t.openAnim) {
+            var sparkle = Math.sin((animTime || 0) * 6) > 0.4;
+            if (sparkle) {
+                px(ctx, tx + 10, ty - 12, PIXEL_PAL.goldHi);
+                px(ctx, tx - 11, ty - 6, PIXEL_PAL.goldHi);
+            }
+        }
         ctx.restore();
     }
 
     function drawAimReticle(ctx, state) {
         if (state.phase !== STATE_PLAYING) return;
-        var mx = state.input.mouseX;
-        var my = state.input.mouseY;
-        var s = 8;
+        var mx = Math.round(state.input.mouseX);
+        var my = Math.round(state.input.mouseY);
+        var s = PX * 4;
         ctx.save();
-        ctx.strokeStyle = "rgba(255, 209, 102, 0.6)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(mx - s, my); ctx.lineTo(mx - 3, my);
-        ctx.moveTo(mx + 3, my); ctx.lineTo(mx + s, my);
-        ctx.moveTo(mx, my - s); ctx.lineTo(mx, my - 3);
-        ctx.moveTo(mx, my + 3); ctx.lineTo(mx, my + s);
-        ctx.stroke();
-        ctx.fillStyle = "rgba(255, 209, 102, 0.35)";
-        ctx.beginPath();
-        ctx.arc(mx, my, 2, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.imageSmoothingEnabled = false;
+        drawRect(ctx, mx - s, my - PX / 2, PX * 2, PX, PIXEL_PAL.gold);
+        drawRect(ctx, mx + s - PX * 2, my - PX / 2, PX * 2, PX, PIXEL_PAL.gold);
+        drawRect(ctx, mx - PX / 2, my - s, PX, PX * 2, PIXEL_PAL.gold);
+        drawRect(ctx, mx - PX / 2, my + s - PX * 2, PX, PX * 2, PIXEL_PAL.gold);
+        drawRect(ctx, mx - PX, my - PX, PX * 2, PX * 2, PIXEL_PAL.goldHi);
         ctx.restore();
     }
 
@@ -2026,6 +2226,7 @@
         var canvas = el("hud-minimap");
         if (!canvas || !state.map) return;
         var ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
         var W = canvas.width, H = canvas.height;
         ctx.clearRect(0, 0, W, H);
         ctx.fillStyle = "rgba(5, 8, 17, 0.92)";
@@ -3379,18 +3580,17 @@
 
     function drawEnemyShots(ctx, state) {
         if (!state.enemyShots) return;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
         for (var i = 0; i < state.enemyShots.length; i++) {
             var s = state.enemyShots[i];
             var shotColor = s.arch === "archer" ? "#ff8a3d" : "#ff66aa";
-            ctx.save();
-            ctx.fillStyle = shotColor;
-            ctx.shadowColor = shotColor;
-            ctx.shadowBlur = s.arch === "archer" ? 14 : 10;
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+            var sx = Math.round(s.x);
+            var sy = Math.round(s.y);
+            drawRect(ctx, sx - PX, sy - PX, PX * 2, PX * 2, shotColor);
+            drawRect(ctx, sx - PX / 2, sy - PX * 2, PX, PX * 3, PIXEL_PAL.white);
         }
+        ctx.restore();
     }
 
     function updateEnemies(state, dt) {
@@ -3575,7 +3775,8 @@
             ctx.globalAlpha = alpha;
             ctx.translate(sx, sy);
             ctx.scale(sc, sc);
-            ctx.font = "bold 14px monospace";
+            ctx.font = "bold 12px monospace";
+            ctx.imageSmoothingEnabled = false;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillStyle = "rgba(0,0,0,0.5)";

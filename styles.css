@@ -258,6 +258,17 @@ body {
     background: #050811;
 }
 
+.hud-minimap {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.hp-bar-fill,
+.mp-bar-fill,
+.boss-hp-fill {
+    border-radius: 0;
+}
+
 .sidebar {
     border: 1px solid var(--line);
     background: rgba(11, 15, 26, 0.7);
