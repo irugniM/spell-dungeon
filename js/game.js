@@ -1779,22 +1779,78 @@
         "....LL..LL.....",
     ];
 
+    /**
+     * Cosmetic tint covers the whole outfit (hat, robe, boots) so a shop
+     * swatch and the in-game wizard read as the same color. Skin, eyes,
+     * and the gold staff stay fixed.
+     */
+    function wizardPalette(tintColor) {
+        var body = tintColor || "#6cf2a6";
+        return {
+            H: shadeColor(body, -100),
+            R: body,
+            a: shadeColor(body, -40),
+            b: "#e8c9a0",
+            F: PIXEL_PAL.white,
+            L: shadeColor(body, -70),
+        };
+    }
+
+    /** Sprite plus staff. `scale` is the pixel size; the dungeon uses PX. */
+    function paintWizardSprite(ctx, x, y, tintColor, scale, faceX, faceY) {
+        var palette = wizardPalette(tintColor);
+        blitSprite(ctx, x, y, PLAYER_SPRITE, palette, scale, faceX < 0);
+        var len = Math.sqrt(faceX * faceX + faceY * faceY) || 1;
+        var unit = scale / PX;
+        var sx = Math.round(x + (faceX / len) * 10 * unit);
+        var sy = Math.round(y + (faceY / len) * 10 * unit);
+        drawRect(ctx, sx - scale, sy - scale, scale * 2, scale * 2, PIXEL_PAL.goldHi);
+        drawRect(ctx, sx, sy - scale * 2, scale, scale * 4, PIXEL_PAL.gold);
+        return palette;
+    }
+
+    /**
+     * Shop preview: same floor colors, shadow, sprite, and staff as the
+     * dungeon, drawn crisp at an integer pixel scale.
+     */
+    function paintWizardPreview(canvas, tintColor, scale) {
+        if (!canvas || !canvas.getContext) return;
+        scale = scale || 4;
+        var unit = scale / PX;
+        var spriteW = 15 * scale;
+        var spriteH = 9 * scale;
+        var margin = scale * 3;
+        var staffPastCenter = Math.round(10 * unit + scale * 2);
+        var cy = Math.round(margin + spriteH / 2);
+        var w = Math.round(spriteW + margin * 2);
+        var h = Math.round(cy + staffPastCenter + margin);
+        var cx = Math.round(w / 2);
+        canvas.width = w;
+        canvas.height = h;
+        var ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+        var floorBase = "#0e162a";
+        var floorHi = "#131f38";
+        var floorLo = "#0c1528";
+        drawRect(ctx, 0, 0, w, h, floorBase);
+        for (var ty = 0; ty < h; ty += TILE) {
+            for (var tx = 0; tx < w; tx += TILE) {
+                drawDitherTile(ctx, tx, ty, floorHi, floorLo, (tx / TILE) + (ty / TILE) * 3);
+            }
+        }
+        var shadowW = Math.round((PLAYER_RADIUS + 2) * 2 * unit);
+        var shadowH = Math.max(scale, Math.round(PX * 2 * unit));
+        drawRect(ctx, Math.round(cx - shadowW / 2), Math.round(cy + 8 * unit), shadowW, shadowH, PIXEL_PAL.shadow);
+        paintWizardSprite(ctx, cx, cy, tintColor, scale, 0, 1);
+        drawBrickBorder(ctx, 0, 0, w, h, "#243a5c");
+    }
+
     function drawPlayer(ctx, p) {
         var x = Math.round(p.x);
         var y = Math.round(p.y);
         var bob = Math.round(Math.sin(performance.now() * 0.006 + x * 0.05) * PX);
         y += bob;
-        var bodyColor = p.tintColor || "#6cf2a6";
-        var accent = shadeColor(bodyColor, -40);
-        var dark = shadeColor(bodyColor, -70);
-        var palette = {
-            H: "#2a1a4a",
-            R: bodyColor,
-            a: accent,
-            b: "#e8c9a0",
-            F: PIXEL_PAL.white,
-            L: dark,
-        };
+        var palette = wizardPalette(p.tintColor);
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         drawRect(ctx, x - PLAYER_RADIUS - 2, y + 8, (PLAYER_RADIUS + 2) * 2, PX * 2, PIXEL_PAL.shadow);
@@ -1814,14 +1870,7 @@
             px(ctx, x - PLAYER_RADIUS - 6, y - 4, PIXEL_PAL.gold);
             px(ctx, x + PLAYER_RADIUS + 2, y - 4, PIXEL_PAL.gold);
         }
-        var fx = p.faceX;
-        var flipX = fx < 0;
-        blitSprite(ctx, x, y, PLAYER_SPRITE, palette, PX, flipX);
-        var len = Math.sqrt(p.faceX * p.faceX + p.faceY * p.faceY) || 1;
-        var sx = Math.round(x + (p.faceX / len) * 10);
-        var sy = Math.round(y + (p.faceY / len) * 10);
-        drawRect(ctx, sx - PX, sy - PX, PX * 2, PX * 2, PIXEL_PAL.goldHi);
-        drawRect(ctx, sx, sy - PX * 2, PX, PX * 4, PIXEL_PAL.gold);
+        paintWizardSprite(ctx, x, y, p.tintColor, PX, p.faceX || 0, p.faceY == null ? 1 : p.faceY);
         ctx.restore();
     }
 
@@ -4029,5 +4078,6 @@
         getAchievements: getUnlockedAchievements,
         getDailySeed: getDailySeed,
         syncTypingTierFromStorage: syncTypingTierFromStorage,
+        paintWizardPreview: paintWizardPreview,
     };
 })(window);

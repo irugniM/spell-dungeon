@@ -16,6 +16,7 @@
 
     var BASE_HEALTH = 100;
     var BASE_LEVEL3_TIME = 60;
+    var shopFlash = null;
 
     function dailyMazeSeed() {
         var d = new Date();
@@ -279,6 +280,153 @@
 
 
     /* ------------------------------------------------------------------
+     *  Cosmetic shop — previews use the in-game wizard painter
+     * ------------------------------------------------------------------ */
+    function paintShopCanvas(canvas, tint, displayMultiple) {
+        if (!canvas || !global.Game || !global.Game.paintWizardPreview) return;
+        // Native dungeon pixel size, then an integer CSS scale so the
+        // preview stays on the same pixel grid as the in-game sprite.
+        global.Game.paintWizardPreview(canvas, tint, 2);
+        var mult = displayMultiple || 3;
+        canvas.style.width = (canvas.width * mult) + "px";
+        canvas.style.maxWidth = "100%";
+        canvas.style.height = "auto";
+        canvas.style.imageRendering = "pixelated";
+    }
+
+    function shopDetail(def, owned, equipped) {
+        if (equipped) return "This tint is on your wizard in the dungeon.";
+        if (owned) return "Unlocked. Equip again any time for free.";
+        if (def.cost <= 0) return "Starter tint. Equip for free.";
+        return "Unlock once for " + def.cost + " coins, then equip free.";
+    }
+
+    function buildColorShop(username, role) {
+        var coins = global.Meta ? global.Meta.getCoins(username) : 0;
+        var shopColors = global.Meta ? global.Meta.SHOP_COLORS : [];
+        var activeColorId = global.Meta ? global.Meta.getColorId(username) : "mint";
+        var activeDef = global.Meta ? global.Meta.getColorDef(activeColorId) : shopColors[0];
+        var shopStatus = el("p", { class: "status shop-status" });
+        var heroCanvas = el("canvas", {
+            class: "color-shop-hero",
+            width: 96,
+            height: 80,
+            "aria-hidden": "true",
+        });
+        var kicker = el("span", { class: "color-shop-kicker", text: "Equipped" });
+        var heroName = el("span", { class: "color-shop-name", text: activeDef ? activeDef.name : "Mint" });
+        var heroDetail = el("p", {
+            class: "color-shop-detail",
+            text: activeDef ? shopDetail(activeDef, true, true) : "",
+        });
+        var stageCopy = el("div", { class: "color-shop-stage-copy" }, [kicker, heroName, heroDetail]);
+
+        function showHero(def, mode) {
+            if (!def) return;
+            var owned = global.Meta ? global.Meta.ownsColor(username, def.id) : def.cost === 0;
+            var equipped = def.id === activeColorId;
+            var previewing = mode === "preview" && !equipped;
+            paintShopCanvas(heroCanvas, def.color, 4);
+            kicker.textContent = previewing ? "Preview" : "Equipped";
+            heroName.textContent = def.name;
+            heroDetail.textContent = shopDetail(def, owned, equipped && !previewing);
+        }
+
+        var shopGrid = el("div", { class: "color-shop-grid" });
+        shopColors.forEach(function (def) {
+            var owned = global.Meta ? global.Meta.ownsColor(username, def.id) : def.cost === 0;
+            var equipped = activeColorId === def.id;
+            var stateClass = equipped ? " is-equipped" : owned ? " is-owned" : " is-locked";
+            var aria = def.name + " wizard";
+            if (equipped) aria += ", equipped";
+            else if (owned) aria += ", owned, equip for free";
+            else aria += ", locked, " + def.cost + " coins";
+            var canvas = el("canvas", {
+                class: "color-card-sprite",
+                width: 72,
+                height: 64,
+                "aria-hidden": "true",
+            });
+            canvas.dataset.tint = def.color;
+            var meta = el("span", { class: "color-card-meta" });
+            if (equipped) {
+                meta.appendChild(el("span", { class: "color-card-badge", text: "Equipped" }));
+            } else if (owned) {
+                meta.appendChild(el("span", { class: "color-card-badge", text: "Owned" }));
+            } else {
+                meta.appendChild(el("span", { class: "color-card-badge", text: "Locked" }));
+                var price = el("span", {
+                    class: "color-card-price" + (coins >= def.cost ? " can-afford" : " is-short"),
+                });
+                price.appendChild(el("span", { class: "coin-pip", "aria-hidden": "true" }));
+                price.appendChild(document.createTextNode(String(def.cost)));
+                meta.appendChild(price);
+            }
+            var card = el("button", {
+                type: "button",
+                class: "color-card" + stateClass,
+                title: aria,
+                "aria-pressed": equipped ? "true" : "false",
+                "aria-label": aria,
+            }, [
+                canvas,
+                el("span", { class: "color-card-name", text: def.name }),
+                meta,
+            ]);
+            card.addEventListener("mouseenter", function () { showHero(def, "preview"); });
+            card.addEventListener("focus", function () { showHero(def, "preview"); });
+            card.addEventListener("mouseleave", function () { showHero(activeDef, "equipped"); });
+            card.addEventListener("blur", function () { showHero(activeDef, "equipped"); });
+            card.addEventListener("click", function () {
+                if (!global.Meta) return;
+                if (global.Meta.getColorId(username) === def.id) return;
+                if (!global.Meta.ownsColor(username, def.id)) {
+                    var buy = global.Meta.buyColor(username, def.id);
+                    if (!buy.ok) {
+                        setStatus(shopStatus, buy.reason || "Not enough coins.", "bad");
+                        return;
+                    }
+                    shopFlash = { text: "Unlocked " + def.name + ".", kind: "good" };
+                } else {
+                    global.Meta.setColorId(username, def.id);
+                    shopFlash = { text: "Equipped " + def.name + ".", kind: "good" };
+                }
+                renderHome(username, role);
+            });
+            shopGrid.appendChild(card);
+        });
+
+        var coinLine = el("p", { class: "coin-balance" });
+        coinLine.appendChild(el("span", { class: "coin-pip", "aria-hidden": "true" }));
+        coinLine.appendChild(document.createTextNode("Coins: " + coins));
+
+        var shopSection = el("div", { class: "color-shop" }, [
+            el("div", { class: "color-shop-head" }, [
+                el("h3", { class: "color-shop-title", text: "Cosmetic shop" }),
+                coinLine,
+            ]),
+            el("p", {
+                class: "screen-sub",
+                text: "Earn coins from score ÷ 1000 each run. Pick a wizard tint — paid colors unlock once, then equip free.",
+            }),
+            el("div", { class: "color-shop-stage" }, [heroCanvas, stageCopy]),
+            shopGrid,
+            shopStatus,
+        ]);
+
+        shopSection._hadFlash = !!shopFlash;
+        if (shopFlash) {
+            setStatus(shopStatus, shopFlash.text, shopFlash.kind);
+            shopFlash = null;
+        }
+        showHero(activeDef, "equipped");
+        shopGrid.querySelectorAll(".color-card-sprite").forEach(function (canvas) {
+            paintShopCanvas(canvas, canvas.dataset.tint, 3);
+        });
+        return shopSection;
+    }
+
+    /* ------------------------------------------------------------------
      *  Player home
      * ------------------------------------------------------------------ */
     function renderHome(username, role) {
@@ -344,48 +492,7 @@
             achList.appendChild(li);
         });
 
-        var coins = global.Meta ? global.Meta.getCoins(username) : 0;
-        var shopColors = global.Meta ? global.Meta.SHOP_COLORS : [];
-        var activeColorId = global.Meta ? global.Meta.getColorId(username) : "mint";
-        var shopStatus = el("p", { class: "status" });
-        var shopGrid = el("div", { class: "color-shop-grid" });
-        shopColors.forEach(function (def) {
-            var owned = global.Meta ? global.Meta.ownsColor(username, def.id) : def.cost === 0;
-            var swatch = el("button", {
-                type: "button",
-                class: "color-swatch" + (activeColorId === def.id ? " active" : "") + (!owned ? " locked" : ""),
-                title: def.name + (def.cost > 0 ? " — " + def.cost + " coins" : ""),
-            });
-            swatch.style.setProperty("--swatch", def.color);
-            swatch.appendChild(el("span", { class: "color-swatch-label", text: def.name }));
-            if (def.cost > 0 && !owned) {
-                swatch.appendChild(el("span", { class: "color-swatch-cost", text: String(def.cost) }));
-            }
-            swatch.addEventListener("click", function () {
-                if (!global.Meta) return;
-                if (global.Meta.getColorId(username) === def.id) return;
-                if (!global.Meta.ownsColor(username, def.id)) {
-                    var buy = global.Meta.buyColor(username, def.id);
-                    if (!buy.ok) {
-                        setStatus(shopStatus, buy.reason || "Not enough coins.", "bad");
-                        return;
-                    }
-                    setStatus(shopStatus, "Unlocked " + def.name + "!", "good");
-                } else {
-                    global.Meta.setColorId(username, def.id);
-                    setStatus(shopStatus, "Equipped " + def.name + ".", "good");
-                }
-                renderHome(username, role);
-            });
-            shopGrid.appendChild(swatch);
-        });
-        var shopSection = el("div", { class: "color-shop" }, [
-            el("h3", { class: "home-section-title", text: "Cosmetic shop" }),
-            el("p", { class: "screen-sub", text: "Earn coins from score ÷ 1000 each run. Pick a wizard tint — paid colors unlock once, then equip free." }),
-            el("p", { class: "coin-balance", text: "Coins: " + coins }),
-            shopGrid,
-            shopStatus,
-        ]);
+        var shopSection = buildColorShop(username, role);
 
         var card = el("section", { class: "screen" }, [
             el("p", { class: "welcome", text: "Welcome, " + username }),
@@ -405,6 +512,9 @@
         ]);
 
         host().appendChild(card);
+        if (shopSection._hadFlash && shopSection.scrollIntoView) {
+            shopSection.scrollIntoView({ block: "center" });
+        }
     }
 
     /* ------------------------------------------------------------------
