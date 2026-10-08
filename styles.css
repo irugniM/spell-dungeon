@@ -2782,67 +2782,251 @@ kbd {
 
 .color-shop {
     margin: 16px 0;
-    padding: 14px 16px;
+    padding: 14px;
     border: 2px solid var(--line);
     background: rgba(0, 0, 0, 0.28);
     box-shadow: var(--bevel-in);
 }
 
-.color-shop-grid {
+.color-shop-head {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
+    margin-bottom: 8px;
 }
 
-.color-swatch {
-    position: relative;
-    min-width: 88px;
-    padding: 10px 12px 10px 10px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.4);
-    cursor: pointer;
-    font-family: var(--pixel);
-    font-size: 10px;
-    color: var(--text);
-    text-align: left;
+.color-shop-title {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-2);
+    text-shadow: 2px 2px 0 #000;
 }
 
-.color-swatch::before {
-    content: "";
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    margin-right: 8px;
-    vertical-align: middle;
-    border-radius: 50%;
-    background: var(--swatch, #6cf2a6);
-    box-shadow: 0 0 8px var(--swatch, #6cf2a6);
-}
-
-.color-swatch.active {
-    border-color: var(--good);
-    box-shadow: 0 0 12px rgba(108, 242, 166, 0.35);
-}
-
-.color-swatch.locked {
-    opacity: 0.72;
-}
-
-.color-swatch-cost {
-    display: block;
-    margin-top: 4px;
-    margin-left: 24px;
-    color: var(--warn);
+.color-shop .screen-sub {
+    margin: 0 0 12px;
     font-size: 9px;
+    line-height: 1.7;
 }
 
 .coin-balance {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 6px 8px;
+    border: 2px solid var(--line);
+    background: #1a1008;
+    box-shadow: var(--bevel-in);
+    color: var(--accent-2);
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+}
+
+.coin-pip {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    background: linear-gradient(180deg, #fff3b0 0%, #ffd166 46%, #b8922e 100%);
+    border: 1px solid #8b6914;
+    box-shadow: 1px 1px 0 #000;
+}
+
+.color-shop-stage {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    margin: 0 0 12px;
+    padding: 10px;
+    border: 2px solid var(--line);
+    background: #120c06;
+    box-shadow: var(--bevel-in);
+}
+
+.color-shop-hero,
+.color-card-sprite {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #0e162a;
+}
+
+.color-shop-hero {
+    width: 152px;
+    max-width: 100%;
+    height: auto;
+}
+
+.color-shop-kicker {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 8px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.color-shop-name {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--parchment);
+    font-size: 14px;
+    letter-spacing: 0.08em;
+}
+
+.color-shop-detail {
+    margin: 0;
+    color: var(--muted);
+    font-size: 8px;
+    line-height: 1.7;
+}
+
+.color-shop-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.color-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+    padding: 8px;
+    border: 3px solid var(--line);
+    border-color: var(--line-light) var(--panel-dark) var(--panel-dark) var(--line-light);
+    background: linear-gradient(180deg, #3d2c1c, #24180e);
+    color: var(--text);
+    font-family: var(--pixel);
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45);
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.color-card-sprite {
+    width: 114px;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    pointer-events: none;
+}
+
+.color-card-name {
+    color: var(--parchment);
+    font-size: 8px;
+    line-height: 1.4;
+}
+
+.color-card-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-height: 22px;
+}
+
+.color-card-badge {
+    color: var(--muted);
+    font-size: 7px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.4;
+}
+
+.color-card-price {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     color: var(--warn);
-    font-size: 11px;
-    letter-spacing: 0.1em;
-    margin: 0 0 4px;
+    font-size: 8px;
+    line-height: 1.2;
+}
+
+.color-card-price.is-short {
+    color: var(--bad-bright);
+}
+
+.color-card.is-equipped {
+    border-color: var(--accent);
+    background: linear-gradient(180deg, #5a4320, #2a1c0e);
+    box-shadow: 0 0 0 1px #8b6914, 3px 3px 0 rgba(0, 0, 0, 0.55);
+}
+
+.color-card.is-equipped .color-card-badge {
+    color: var(--accent-2);
+}
+
+.color-card.is-owned .color-card-badge {
+    color: var(--good-bright);
+}
+
+.color-card.is-locked .color-card-badge {
+    color: var(--bad-bright);
+}
+
+.color-card:focus {
+    outline: none;
+}
+
+.color-card:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 3px;
+}
+
+.color-card:active {
+    transform: translate(1px, 1px);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.shop-status {
+    margin-top: 10px;
+    min-height: 16px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .color-card:hover {
+        border-color: var(--accent);
+        filter: brightness(1.08);
+    }
+}
+
+@media (max-width: 720px) {
+    .color-shop-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    body:not(.in-game) .stage {
+        padding: 12px 10px;
+    }
+    body:not(.in-game) .screen {
+        padding: 16px 12px;
+    }
+    .color-shop {
+        padding: 10px;
+    }
+    .color-shop-stage {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+    }
+    .color-shop-hero {
+        width: min(168px, 72%);
+    }
 }
 
 .title-animated,
