@@ -221,20 +221,30 @@
         renderTopbar([]);
         setFooter("");
 
-        var username = makeFormRow("Player name", { type: "text", autocomplete: "username", value: (prefill && prefill.username) || "" });
+        var username = makeFormRow("Enter your name", { type: "text", autocomplete: "username", value: (prefill && prefill.username) || "" });
         var status = el("p", { class: "status" });
 
         var play = makeButton("Play", "primary", submit);
 
-        var card = el("section", { class: "screen" }, [
-            el("h2", { text: "Enter your name" }),
-            el("p", {
-                class: "screen-sub",
-                text: "Arcade-style login — no password. Stats, coins, and save slots are stored locally per name.",
-            }),
-            el("div", { class: "form-grid" }, [username.row]),
-            el("div", { class: "actions" }, [play]),
-            status,
+        var card = el("section", { class: "screen screen-login" }, [
+            el("div", { class: "login-hero" }, [
+                el("span", { class: "forge-mark", "aria-hidden": "true" }),
+                el("h1", { class: "forge-title", text: "Spell Dungeon" }),
+                el("span", { class: "forge-tag", text: "Web Edition" }),
+                el("p", {
+                    class: "forge-sub",
+                    text: "A retro top-down dungeon shooter. Cast spells by typing, slay enemies, beat the boss, and climb the local leaderboard.",
+                }),
+            ]),
+            el("div", { class: "login-plate" }, [
+                el("div", { class: "form-grid" }, [username.row]),
+                el("p", {
+                    class: "screen-sub",
+                    text: "Arcade-style login — no password. Stats, coins, and save slots are stored locally per name.",
+                }),
+                el("div", { class: "actions" }, [play]),
+                status,
+            ]),
         ]);
 
         function submit() {
@@ -494,7 +504,7 @@
 
         var shopSection = buildColorShop(username, role);
 
-        var card = el("section", { class: "screen" }, [
+        var card = el("section", { class: "screen screen-home" }, [
             el("p", { class: "welcome", text: "Welcome, " + username }),
             el("h2", { class: "home-title-animated", text: "Spell Dungeon" }),
             el("p", { class: "screen-sub", text: "Pick a save slot to play, dive into the leaderboard, or check your typing stats." }),
@@ -503,12 +513,12 @@
                 class: "home-seed",
                 text: mapSeed ? "Last run maze seed: " + mapSeed : "Maze seed: — (shown in HUD and pause while playing)",
             }),
+            actionGrid,
             typingPanel,
             statsBox,
             shopSection,
             el("h3", { class: "home-section-title", text: "Achievements" }),
             achList,
-            actionGrid,
         ]);
 
         host().appendChild(card);
@@ -677,7 +687,7 @@
             el("li", { text: "On the home screen, pick a typing tier (Grade 1–6 through IELTS/TOEFL). Pills show real-world WPM bands and accuracy goals (e.g. Grade 1–6 · 5–30 WPM · 80%+ acc). Spell time scales with sentence length; IELTS/TOEFL uses generous timers for exam-style thinking." }),
             el("li", { text: "Type the displayed sentence within the timer shown (it adjusts per sentence). A perfect cast loads a charged fireball into your hotbar (slots 1–6); charged shots deal extra damage." }),
             el("li", { text: "Pickups: green Health hearts auto-heal on contact. Strength and Invincibility potions drop into your inventory for later use. Potion-only rooms count as cleared immediately (no enemies to defeat)." }),
-            el("li", { text: "Quick potions: the bottom-right HUD bar shows Health (1), Strength (2), and Invincibility (3) with stack counts — click a slot or press its key during play. Tab still opens the full 12-slot inventory." }),
+            el("li", { text: "Quick potions: the bottom HUD bar shows Health (1), Strength (2), and Invincibility (3) with stack counts — click a slot or press its key during play. Tab still opens the full 12-slot inventory." }),
             el("li", { text: "Loaded fireballs show as \"Fireballs: N\" above the spell hotbar; glowing slots are ready to fire (Space / click, 10 MP each)." }),
             el("li", { text: "When the boss is alive, a BOSS health bar appears under your HP. Below 25% HP a red vignette warns you; below 15% it pulses faster with a heartbeat sound." }),
             el("li", { text: "A red arc on the screen edge points toward the last enemy that hit you. Combo x5 and x10 grant bonus toasts; x10 doubles kill score for 10 seconds." }),

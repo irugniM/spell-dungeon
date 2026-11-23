@@ -169,7 +169,7 @@
     function enemyDisplayName(e) {
         var name = ARCHETYPE_NAMES[e.archetype] || "Foe";
         if (e.isChampion) return "Champion " + name;
-        return e.isElite ? name + "★" : name;
+        return e.isElite ? name + " Elite" : name;
     }
 
     function getDailySeed(username) {
@@ -195,7 +195,7 @@
 
     var INVENTORY_SIZE = 12;
     var QUICK_POTION_TYPES = ["Health", "Strength", "Invincibility"];
-    var QUICK_POTION_GLYPHS = { Health: "♥", Strength: "⚔", Invincibility: "★" };
+    var QUICK_POTION_LABELS = { Health: "Heal", Strength: "Str", Invincibility: "Inv" };
     var HOTBAR_SIZE = 6;
 
     // startIndex / bossIndex are now stored on the map object (dynamic per level)
@@ -513,10 +513,10 @@
 
     function floorThemeTint(level) {
         var tints = [
-            "rgba(70, 110, 200, 0.05)",
-            "rgba(120, 70, 180, 0.06)",
-            "rgba(200, 80, 90, 0.07)",
-            "rgba(60, 180, 140, 0.06)",
+            "rgba(255, 106, 26, 0.05)",
+            "rgba(255, 70, 20, 0.06)",
+            "rgba(200, 60, 20, 0.07)",
+            "rgba(255, 150, 60, 0.06)",
         ];
         return tints[(Math.max(1, level) - 1) % tints.length];
     }
@@ -554,7 +554,7 @@
 
     function pushKillFeed(state, label) {
         if (!state.killFeed) state.killFeed = [];
-        var kind = label.indexOf("Champion") >= 0 ? "champion" : label.indexOf("★") >= 0 ? "elite" : label.indexOf("Boss") >= 0 ? "boss" : "normal";
+        var kind = label.indexOf("Champion") >= 0 ? "champion" : label.indexOf(" Elite") >= 0 ? "elite" : label.indexOf("Boss") >= 0 ? "boss" : "normal";
         state.killFeed.unshift({ text: label, life: 4, maxLife: 4, kind: kind });
         while (state.killFeed.length > 3) state.killFeed.pop();
     }
@@ -1568,8 +1568,8 @@
         void: "#050811",
         stone: "#1a2844",
         stoneHi: "#243656",
-        stoneLo: "#0f1828",
-        mortar: "#0c1424",
+        stoneLo: "#0a0806",
+        mortar: "#100d0b",
         wood: "#4a2e18",
         woodHi: "#6b4426",
         woodLo: "#2a1810",
@@ -1641,10 +1641,10 @@
     }
 
     function drawRoomFloor(ctx, room, isStart, isBoss) {
-        var base = isStart ? "#0e1a2c" : isBoss ? "#1c0d18" : "#0e162a";
-        var c1 = isBoss ? "#280d1f" : isStart ? "#152540" : "#131f38";
-        var c2 = isBoss ? "#1a0916" : isStart ? "#0d1731" : "#0c1528";
-        var accent = isBoss ? "#5c1a38" : isStart ? "#2a4a72" : "#243a5c";
+        var base = isStart ? "#1a1410" : isBoss ? "#1e0c08" : "#141210";
+        var c1 = isBoss ? "#2e100a" : isStart ? "#2a1c12" : "#1c1814";
+        var c2 = isBoss ? "#1c0a06" : isStart ? "#1a120c" : "#12100e";
+        var accent = isBoss ? "#a8341a" : isStart ? "#8a4a20" : "#4a3628";
         drawRect(ctx, room.x, room.y, room.w, room.h, base);
         var tilesX = Math.floor(room.w / TILE);
         var tilesY = Math.floor(room.h / TILE);
@@ -1655,7 +1655,7 @@
                 if ((tx + ty) % 5 === 0 && !isBoss) {
                     ctx.save();
                     ctx.globalAlpha = 0.12;
-                    drawRect(ctx, room.x + tx * TILE + 8, room.y + ty * TILE + 8, PX * 2, PX * 2, "#6a7a9a");
+                    drawRect(ctx, room.x + tx * TILE + 8, room.y + ty * TILE + 8, PX * 2, PX * 2, "#ff7a2a");
                     ctx.restore();
                 }
             }
@@ -1669,12 +1669,12 @@
             for (var ring = 0; ring < 14; ring++) {
                 var rr = 90 - ring * 6;
                 if (rr <= 0) break;
-                drawRect(ctx, cx - rr, cy - rr, rr * 2, rr * 2, ring % 2 ? "#4a1028" : "#2a0818");
+                drawRect(ctx, cx - rr, cy - rr, rr * 2, rr * 2, ring % 2 ? "#6a1c0c" : "#3a1008");
             }
             ctx.restore();
             for (var rune = 0; rune < 8; rune++) {
                 var ang = (rune / 8) * Math.PI * 2;
-                px(ctx, cx + Math.round(Math.cos(ang) * 72) - PX, cy + Math.round(Math.sin(ang) * 72) - PX, "#ff5d6c");
+                px(ctx, cx + Math.round(Math.cos(ang) * 72) - PX, cy + Math.round(Math.sin(ang) * 72) - PX, "#ff6a1a");
             }
         }
     }
@@ -1690,13 +1690,13 @@
                     ctx,
                     corridor.x + tx * TILE,
                     corridor.y + ty * TILE,
-                    "#121e34",
-                    "#0e172c",
+                    "#181512",
+                    "#100e0c",
                     seed
                 );
             }
         }
-        drawBrickBorder(ctx, corridor.x + 2, corridor.y + 2, corridor.w - 4, corridor.h - 4, "#1e3050");
+        drawBrickBorder(ctx, corridor.x + 2, corridor.y + 2, corridor.w - 4, corridor.h - 4, "#3a3028");
     }
 
     /**
@@ -1706,7 +1706,7 @@
      */
     function carveDoorways(ctx, map) {
         ctx.save();
-        ctx.fillStyle = "#0c142a";
+        ctx.fillStyle = "#100d0b";
         for (var i = 0; i < map.corridors.length; i++) {
             var co = map.corridors[i];
             var fromR = map.rooms[co.fromIndex];
@@ -1829,9 +1829,9 @@
         canvas.height = h;
         var ctx = canvas.getContext("2d");
         ctx.imageSmoothingEnabled = false;
-        var floorBase = "#0e162a";
-        var floorHi = "#131f38";
-        var floorLo = "#0c1528";
+        var floorBase = "#141210";
+        var floorHi = "#1c1814";
+        var floorLo = "#12100e";
         drawRect(ctx, 0, 0, w, h, floorBase);
         for (var ty = 0; ty < h; ty += TILE) {
             for (var tx = 0; tx < w; tx += TILE) {
@@ -1842,7 +1842,7 @@
         var shadowH = Math.max(scale, Math.round(PX * 2 * unit));
         drawRect(ctx, Math.round(cx - shadowW / 2), Math.round(cy + 8 * unit), shadowW, shadowH, PIXEL_PAL.shadow);
         paintWizardSprite(ctx, cx, cy, tintColor, scale, 0, 1);
-        drawBrickBorder(ctx, 0, 0, w, h, "#243a5c");
+        drawBrickBorder(ctx, 0, 0, w, h, "#4a3628");
     }
 
     function drawPlayer(ctx, p) {
@@ -2278,9 +2278,9 @@
         ctx.imageSmoothingEnabled = false;
         var W = canvas.width, H = canvas.height;
         ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = "rgba(5, 8, 17, 0.92)";
+        ctx.fillStyle = "rgba(10, 8, 6, 0.92)";
         ctx.fillRect(0, 0, W, H);
-        ctx.strokeStyle = "rgba(255, 209, 102, 0.35)";
+        ctx.strokeStyle = "rgba(255, 122, 42, 0.35)";
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 
@@ -2308,7 +2308,7 @@
 
         var edges = state.map.edges || [];
         if (edges.length) {
-            ctx.strokeStyle = "rgba(255, 209, 102, 0.28)";
+            ctx.strokeStyle = "rgba(255, 122, 42, 0.28)";
             ctx.lineWidth = 1;
             for (var ei = 0; ei < edges.length; ei++) {
                 var edge = edges[ei];
@@ -2335,26 +2335,26 @@
             var isStart = ri === state.map.startIndex;
 
             if (!revealed) {
-                ctx.fillStyle = "#0a0e18";
+                ctx.fillStyle = "#0a0806";
             } else if (!visited) {
-                ctx.fillStyle = "#141c30";
+                ctx.fillStyle = "#1c1814";
             } else if (isBoss) {
-                ctx.fillStyle = "#4a1830";
+                ctx.fillStyle = "#6a1c10";
             } else if (isStart) {
-                ctx.fillStyle = "#1a3050";
+                ctx.fillStyle = "#4a2c14";
             } else {
-                ctx.fillStyle = "#1e2d4a";
+                ctx.fillStyle = "#3a3028";
             }
             ctx.fillRect(rx, ry, rw, rh);
 
             if (isCurrent) {
-                ctx.strokeStyle = "#6cf2a6";
+                ctx.strokeStyle = "#ff7a2a";
                 ctx.lineWidth = 2;
                 ctx.strokeRect(rx - 1, ry - 1, rw + 2, rh + 2);
             }
 
             if (revealed) {
-                ctx.fillStyle = visited ? "#e8eef8" : "#6a7a9a";
+                ctx.fillStyle = visited ? "#f4e0c4" : "#8a7060";
                 ctx.font = "bold 9px monospace";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
@@ -2373,7 +2373,7 @@
         if (hasHotbarCharge(state) && state.currentRoomIndex >= 0) {
             var pulse = 0.5 + 0.5 * Math.sin((state.animTime || 0) * 7);
             var pc = minimapRoomCenter(state.currentRoomIndex);
-            ctx.fillStyle = "rgba(108, 242, 166, " + (0.35 + pulse * 0.55) + ")";
+            ctx.fillStyle = "rgba(255, 192, 120, " + (0.35 + pulse * 0.55) + ")";
             ctx.beginPath();
             ctx.arc(pc.x, pc.y, 3 + pulse * 2.5, 0, Math.PI * 2);
             ctx.fill();
@@ -2497,9 +2497,8 @@
             btn.setAttribute("aria-label", type + " potion, " + count + " in inventory");
             btn.innerHTML =
                 '<span class="potion-key">' + (qi + 1) + "</span>" +
-                '<span class="potion-glyph">' + (QUICK_POTION_GLYPHS[type] || type[0]) + "</span>" +
-                '<span class="potion-label">' + type.slice(0, 4) + "</span>" +
-                '<span class="potion-count">' + count + "</span>";
+                '<span class="potion-label">' + (QUICK_POTION_LABELS[type] || type.slice(0, 4)) + "</span>" +
+                '<span class="potion-count">x' + count + "</span>";
             holder.appendChild(btn);
         }
     }
@@ -2719,7 +2718,6 @@
             if (i < typed.length) {
                 var ch = typed.charAt(i);
                 var display = escapeHtml(ch);
-                if (ch === " ") display = "&nbsp;";
                 if (ch === target.charAt(i)) {
                     html += '<span class="ok">' + display + "</span>";
                 } else {
@@ -2727,14 +2725,9 @@
                     html += '<span class="err">' + display + "</span>";
                 }
             } else {
-                var pendingCh = target.charAt(i);
-                var pendingDisplay = escapeHtml(pendingCh);
-                if (pendingCh === " ") pendingDisplay = "&nbsp;";
-                html += '<span class="pending">' + pendingDisplay + "</span>";
+                if (i === typed.length) html += '<span class="spell-caret" aria-hidden="true"></span>';
+                html += '<span class="pending">' + escapeHtml(target.charAt(i)) + "</span>";
             }
-        }
-        if (typed.length < target.length) {
-            html += '<span class="spell-caret" aria-hidden="true"></span>';
         }
         state.spellErrors = errors;
         prompt.innerHTML = html;
@@ -3864,7 +3857,7 @@
 
     function render(ctx, state) {
         ctx.clearRect(0, 0, VIEW_W, VIEW_H);
-        ctx.fillStyle = "#050811";
+        ctx.fillStyle = "#070605";
         ctx.fillRect(0, 0, VIEW_W, VIEW_H);
         if (!state.map) return;
 

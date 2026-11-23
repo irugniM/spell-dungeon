@@ -97,7 +97,7 @@ app redirect to this same name-entry screen.
 ```
 webgame/
 ├── index.html           # App shell + canvas + overlays
-├── styles.css           # Retro neon theme + screen layouts
+├── styles.css           # Ember Forge theme + screen layouts
 ├── README.md
 └── js/
     ├── app.js           # Boot & session restore
