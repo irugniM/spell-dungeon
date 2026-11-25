@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import vm from "node:vm";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -155,6 +156,187 @@ function checkParse() {
     return errors;
 }
 
+
+function loadGameExports() {
+    const stubNode = () => ({
+        hidden: true,
+        textContent: "",
+        innerHTML: "",
+        className: "",
+        dataset: {},
+        style: {},
+        classList: { add() {}, remove() {}, toggle() {} },
+        addEventListener() {},
+        appendChild() {},
+        cloneNode() { return stubNode(); },
+        parentNode: { replaceChild() {} },
+    });
+    const sandbox = {
+        console,
+        Math,
+        Number,
+        String,
+        Array,
+        Object,
+        Date,
+        JSON,
+        parseInt,
+        parseFloat,
+        isNaN,
+        Infinity,
+        setTimeout: () => 0,
+        clearTimeout() {},
+        requestAnimationFrame: () => 0,
+        cancelAnimationFrame() {},
+        performance: { now: () => 0 },
+        localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+        document: {
+            getElementById: () => null,
+            querySelector: () => null,
+            querySelectorAll: () => [],
+            createElement: stubNode,
+        },
+        window: null,
+    };
+    sandbox.window = sandbox;
+    sandbox.globalThis = sandbox;
+    vm.runInNewContext(read("js/game.js"), sandbox, { filename: "js/game.js" });
+    return sandbox.Game;
+}
+
+function checkSpellPromptWrapAndCaret() {
+    const errors = [];
+    const css = read("styles.css");
+    const promptBlock = css.match(/\.spell-prompt\s*\{[^}]*\}/);
+    if (!promptBlock) {
+        errors.push("styles.css missing .spell-prompt rule");
+    } else {
+        if (/white-space:\s*pre-wrap/i.test(promptBlock[0])) errors.push(".spell-prompt still uses white-space: pre-wrap");
+        if (/overflow-wrap:\s*break-word/i.test(promptBlock[0])) errors.push(".spell-prompt still uses overflow-wrap: break-word");
+    }
+    const wordBlock = css.match(/\.spell-word\s*\{[^}]*\}/);
+    if (!wordBlock || !/white-space:\s*nowrap/i.test(wordBlock[0])) {
+        errors.push("styles.css missing .spell-word with white-space: nowrap");
+    }
+
+    const Game = loadGameExports();
+    if (!Game || typeof Game.buildSpellPromptHtml !== "function") {
+        errors.push("Game.buildSpellPromptHtml is not exported");
+        return errors;
+    }
+
+    const sentence = "The essay thesis should answer a specific question with evidence.";
+    const zero = Game.buildSpellPromptHtml(sentence, "");
+    const zeroCarets = zero.html.match(/class="spell-caret"/g) || [];
+    if (zeroCarets.length !== 1) errors.push(`expected 1 caret at 0 typed, got ${zeroCarets.length}`);
+    if (!zero.html.startsWith('<span class="spell-word"><span class="spell-caret"')) {
+        errors.push("caret at 0 typed is not placed before the first character");
+    }
+    const wordMatches = [...zero.html.matchAll(/<span class="spell-word">(.*?)<\/span>(?=<span class="pending"> |<span class="ok"> |<span class="err">|$)/g)];
+    const wordsText = wordMatches.map((m) => m[1].replace(/<[^>]+>/g, ""));
+    for (const expectedWord of sentence.split(" ")) {
+        if (!wordsText.includes(expectedWord)) {
+            errors.push(`word "${expectedWord}" was split or missing from .spell-word spans`);
+        }
+    }
+
+    const mid = Game.buildSpellPromptHtml(sentence, "The ");
+    const midCarets = mid.html.match(/class="spell-caret"/g) || [];
+    if (midCarets.length !== 1) errors.push(`expected 1 caret mid-sentence, got ${midCarets.length}`);
+    if (!mid.html.includes('<span class="spell-word"><span class="spell-caret" aria-hidden="true"></span><span class="pending">e</span>')) {
+        errors.push("caret at typed.length=4 is not before 'essay'");
+    }
+    if (mid.html.endsWith('<span class="spell-caret" aria-hidden="true"></span>')) {
+        errors.push("caret appeared after final character while typing mid-sentence");
+    }
+
+    const errSpaceInWord = Game.buildSpellPromptHtml("ab cd", "a ");
+    if (errSpaceInWord.errors !== 1 || !errSpaceInWord.html.includes('<span class="err">&nbsp;</span>')) {
+        errors.push("mistyped space inside a word is not visibly marked as .err");
+    }
+    const errCharAtSpace = Game.buildSpellPromptHtml("ab cd", "abx");
+    if (errCharAtSpace.errors !== 1 || !errCharAtSpace.html.includes('<span class="err">x</span>')) {
+        errors.push("mistyped character at a space is not visibly marked as .err");
+    }
+    return errors;
+}
+
+function checkNoBlueCanvas() {
+    const errors = [];
+    const gameJs = read("js/game.js");
+    const bannedHexes = [
+        "#050811", "#06080f", "#1a2844", "#243656", "#0f1828", "#0c1424",
+        "#0e1a2c", "#0e162a", "#1c0d18", "#280d1f", "#152540", "#131f38",
+        "#0d1731", "#0c1528", "#5c1a38", "#2a4a72", "#243a5c", "#121e34",
+        "#0e172c", "#1e3050", "#0c142a", "#0a0e18", "#141c30", "#4a1830",
+        "#1a3050", "#1e2d4a", "#6a7a9a", "#e8eef8", "#a8b4cc", "#6ec1ff",
+    ];
+    const lower = gameJs.toLowerCase();
+    for (const hex of bannedHexes) {
+        if (lower.includes(hex)) errors.push(`js/game.js still contains old blue/slate color ${hex}`);
+    }
+    const palMatch = gameJs.match(/var PIXEL_PAL = \{([\s\S]*?)\};/);
+    if (!palMatch) {
+        errors.push("js/game.js missing PIXEL_PAL");
+    } else {
+        for (const m of palMatch[1].matchAll(/(\w+):\s*"#([0-9a-fA-F]{6})"/g)) {
+            const name = m[1];
+            const r = parseInt(m[2].slice(0, 2), 16);
+            const g = parseInt(m[2].slice(2, 4), 16);
+            const b = parseInt(m[2].slice(4, 6), 16);
+            if (b > r + 15 && b > g + 15) {
+                errors.push(`PIXEL_PAL.${name} (#${m[2]}) is blue-dominant`);
+            }
+        }
+    }
+    return errors;
+}
+
+function stripJsComments(source) {
+    return source
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+}
+
+function checkFontGlyphs() {
+    const errors = [];
+    const allowedExtra = new Set([0x00B7, 0x00D7, 0x00F7, 0x2013, 0x2014, 0x2026]);
+    const uiFiles = ["index.html", "styles.css", ...jsFiles];
+    for (const file of uiFiles) {
+        const content = file.endsWith(".js") ? stripJsComments(read(file)) : read(file);
+        content.split("\n").forEach((line, idx) => {
+            for (const ch of line) {
+                const cp = ch.codePointAt(0);
+                if (cp > 127 && !allowedExtra.has(cp)) {
+                    const hex = cp.toString(16).toUpperCase().padStart(4, "0");
+                    errors.push(`${file}:${idx + 1} has unsupported glyph U+${hex} (${ch})`);
+                }
+            }
+        });
+    }
+    return errors;
+}
+
+function checkDebugRouteAndLayout() {
+    const errors = [];
+    const appJs = read("js/app.js");
+    const gameJs = read("js/game.js");
+    const css = read("styles.css");
+    if (!appJs.includes("startDebug") || !appJs.includes('"boss"') || !appJs.includes('"shrine"')) {
+        errors.push("js/app.js missing ?debug=boss / ?debug=shrine route handling");
+    }
+    if (!gameJs.includes("isDebug") || !gameJs.includes("setupDebugRoom")) {
+        errors.push("js/game.js missing debug room setup and isDebug save guards");
+    }
+    if (!/\.inv-label\s*\{[^}]*overflow-wrap:\s*anywhere/i.test(css)) {
+        errors.push("styles.css missing .inv-label overflow-wrap guard");
+    }
+    if (!/\.slot-card\s*\{[^}]*min-width:\s*0/i.test(css)) {
+        errors.push("styles.css missing .slot-card min-width: 0 guard");
+    }
+    return errors;
+}
+
 const checks = [
     ["a. no emoji in text files", checkEmoji],
     ["b. localStorage keys unchanged", checkStorageKeys],
@@ -163,6 +345,10 @@ const checks = [
     ["e. referenced element ids exist", checkReferencedIds],
     ["f. fonts updated", checkFonts],
     ["g. js files parse", checkParse],
+    ["h. spell prompt wrap, caret, and mistyped space", checkSpellPromptWrapAndCaret],
+    ["i. no blue/navy canvas colours left", checkNoBlueCanvas],
+    ["j. no unsupported font glyphs in UI", checkFontGlyphs],
+    ["k. debug route and layout guards", checkDebugRouteAndLayout],
 ];
 
 let failed = 0;

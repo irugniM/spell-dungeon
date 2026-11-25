@@ -342,6 +342,7 @@
     }
 
     function unlockAchievement(id) {
+        if (currentState && currentState.isDebug) return false;
         if (!ACH_LABELS[id]) return false;
         var ids = loadAchievementIds();
         if (ids.indexOf(id) >= 0) return false;
@@ -402,7 +403,7 @@
         if (p.dashIFrameTimer <= 0 || p.parryUsed) return false;
         p.parryUsed = true;
         showToast(state, "Parried!", 1200);
-        addFloatText(state, p.x, p.y - 26, "Parried!", "#6ec1ff", { scale: 1.15, vy: -55 });
+        addFloatText(state, p.x, p.y - 26, "Parried!", "#ffb060", { scale: 1.15, vy: -55 });
         p.damageCooldown = 0.35;
         playSfx("parry");
         return true;
@@ -601,8 +602,8 @@
         var bossDone = !!(bossRoom && bossRoom.cleared);
         var roomsDone = prog.total > 0 && prog.cleared >= prog.total;
         list.innerHTML =
-            '<li class="quest-item' + (bossDone ? " done" : "") + '">Slay the boss' + (bossDone ? " ✓" : "") + "</li>" +
-            '<li class="quest-item' + (roomsDone ? " done" : "") + '">Clear rooms (' + prog.cleared + "/" + prog.total + ")" + (roomsDone ? " ✓" : "") + "</li>";
+            '<li class="quest-item' + (bossDone ? " done" : "") + '">Slay the boss</li>' +
+            '<li class="quest-item' + (roomsDone ? " done" : "") + '">Clear rooms (' + prog.cleared + "/" + prog.total + ")</li>";
     }
 
     function grantSpellCharge(state) {
@@ -741,7 +742,7 @@
         var CORR_LEN = 5 * TILE;   // length of each corridor segment
         var CELL_W  = ROOM_W + CORR_LEN;
         var CELL_H  = ROOM_H + CORR_LEN;
-        var DOOR_TH = 10;          // door thickness in pixels
+        var DOOR_TH = 14;          // door thickness in pixels
 
         // Number of rooms scales with level: 4 on level 1, up to 9 on level 5+
         var roomCount = Math.max(4, Math.min(4 + Math.floor((level + 1) / 2), COLS * ROWS));
@@ -1257,7 +1258,7 @@
             showToast(state, "Shrine: Strength " + SHRINE_STRENGTH_TIME + "s", 1200);
             playSfx("pickup");
         } else if (grantSpellCharge(state)) {
-            addFloatText(state, shrine.x, shrine.y - 24, "+1 SPELL", "#6ec1ff");
+            addFloatText(state, shrine.x, shrine.y - 24, "+1 SPELL", "#ffb060");
             showToast(state, "Shrine: +1 spell charge", 1200);
             playSfx("pickup");
         } else {
@@ -1565,14 +1566,14 @@
     var PX = 2;
 
     var PIXEL_PAL = {
-        void: "#050811",
-        stone: "#1a2844",
-        stoneHi: "#243656",
-        stoneLo: "#0a0806",
-        mortar: "#100d0b",
-        wood: "#4a2e18",
-        woodHi: "#6b4426",
-        woodLo: "#2a1810",
+        void: "#070605",
+        stone: "#5a4638",
+        stoneHi: "#7a5e4a",
+        stoneLo: "#2a1e16",
+        mortar: "#1c1510",
+        wood: "#6e4020",
+        woodHi: "#9c5e30",
+        woodLo: "#3a2010",
         gold: "#ffd166",
         goldHi: "#fff3b0",
         goldLo: "#b8922e",
@@ -1585,9 +1586,9 @@
         shadow: "rgba(0,0,0,0.45)",
         hp: "#ff5d6c",
         hpBg: "#1a0a0a",
-        mp: "#6ec1ff",
-        white: "#e8eef8",
-        black: "#06080f",
+        mp: "#ff9d5c",
+        white: "#f4e0c4",
+        black: "#070605",
     };
 
     function drawRect(ctx, x, y, w, h, color) {
@@ -1680,7 +1681,7 @@
     }
 
     function drawCorridor(ctx, corridor) {
-        drawRect(ctx, corridor.x, corridor.y, corridor.w, corridor.h, PIXEL_PAL.mortar);
+        drawRect(ctx, corridor.x, corridor.y, corridor.w, corridor.h, "#221a14");
         var tilesX = Math.max(1, Math.floor(corridor.w / TILE));
         var tilesY = Math.max(1, Math.floor(corridor.h / TILE));
         for (var ty = 0; ty < tilesY; ty++) {
@@ -1690,13 +1691,13 @@
                     ctx,
                     corridor.x + tx * TILE,
                     corridor.y + ty * TILE,
-                    "#181512",
-                    "#100e0c",
+                    "#2e231a",
+                    "#221a14",
                     seed
                 );
             }
         }
-        drawBrickBorder(ctx, corridor.x + 2, corridor.y + 2, corridor.w - 4, corridor.h - 4, "#3a3028");
+        drawBrickBorder(ctx, corridor.x + 2, corridor.y + 2, corridor.w - 4, corridor.h - 4, "#6e523c");
     }
 
     /**
@@ -1706,35 +1707,55 @@
      */
     function carveDoorways(ctx, map) {
         ctx.save();
-        ctx.fillStyle = "#100d0b";
         for (var i = 0; i < map.corridors.length; i++) {
             var co = map.corridors[i];
             var fromR = map.rooms[co.fromIndex];
             var toR   = map.rooms[co.toIndex];
+            ctx.fillStyle = "#261d16";
             if (co.dir === 'h') {
                 var leftR  = fromR.col < toR.col ? fromR : toR;
                 var rightR = fromR.col < toR.col ? toR : fromR;
-                // Carve horizontal band between the two inner-wall artefacts
-                var x1 = leftR.x  + leftR.w  - 4;
+                var x1 = leftR.x + leftR.w - 4;
                 var x2 = rightR.x + 4;
                 ctx.fillRect(x1, co.y + 4, x2 - x1, co.h - 8);
+                drawRect(ctx, x1, co.y + 2, x2 - x1, PX, "#7a5b42");
+                drawRect(ctx, x1, co.y + co.h - 4, x2 - x1, PX, "#7a5b42");
             } else {
                 var topR = fromR.row < toR.row ? fromR : toR;
                 var botR = fromR.row < toR.row ? toR : fromR;
-                // Carve vertical band between the two inner-wall artefacts
                 var y1 = topR.y + topR.h - 4;
                 var y2 = botR.y + 4;
                 ctx.fillRect(co.x + 4, y1, co.w - 8, y2 - y1);
+                drawRect(ctx, co.x + 2, y1, PX, y2 - y1, "#7a5b42");
+                drawRect(ctx, co.x + co.w - 4, y1, PX, y2 - y1, "#7a5b42");
             }
         }
         ctx.restore();
     }
 
-    function drawDoor(ctx, door) {
+    function drawDoor(ctx, door, isBossDoor) {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
+        var isHorizPassage = !door.dir || door.dir === "h";
         if (door.open) {
-            drawRect(ctx, door.x, door.y, door.w, door.h, PIXEL_PAL.mortar);
+            var openBase = isBossDoor ? "#3a1c12" : "#34271d";
+            var openStrip = isBossDoor ? "#6e2c18" : "#4e3a2a";
+            var jambColor = isBossDoor ? "#ff7a2a" : "#b88a5e";
+            var jambCap = isBossDoor ? PIXEL_PAL.gold : PIXEL_PAL.goldLo;
+            drawRect(ctx, door.x, door.y, door.w, door.h, openBase);
+            if (isHorizPassage) {
+                drawRect(ctx, door.x + PX, door.y + PX * 2, door.w - PX * 2, door.h - PX * 4, openStrip);
+                drawRect(ctx, door.x, door.y, door.w, PX * 2, jambColor);
+                drawRect(ctx, door.x, door.y + door.h - PX * 2, door.w, PX * 2, jambColor);
+                drawRect(ctx, door.x + PX, door.y + PX * 2, door.w - PX * 2, PX, jambCap);
+                drawRect(ctx, door.x + PX, door.y + door.h - PX * 3, door.w - PX * 2, PX, jambCap);
+            } else {
+                drawRect(ctx, door.x + PX * 2, door.y + PX, door.w - PX * 4, door.h - PX * 2, openStrip);
+                drawRect(ctx, door.x, door.y, PX * 2, door.h, jambColor);
+                drawRect(ctx, door.x + door.w - PX * 2, door.y, PX * 2, door.h, jambColor);
+                drawRect(ctx, door.x + PX * 2, door.y + PX, PX, door.h - PX * 2, jambCap);
+                drawRect(ctx, door.x + door.w - PX * 3, door.y + PX, PX, door.h - PX * 2, jambCap);
+            }
             if (door.flashTimer > 0) {
                 var fa = clamp(door.flashTimer / 0.45, 0, 1) * 0.85;
                 ctx.globalAlpha = fa;
@@ -1747,19 +1768,36 @@
             ctx.restore();
             return;
         }
-        drawRect(ctx, door.x, door.y, door.w, door.h, PIXEL_PAL.woodLo);
+        var frameHi = isBossDoor ? PIXEL_PAL.gold : "#b88a5e";
+        var frameLo = isBossDoor ? "#8a2612" : PIXEL_PAL.woodLo;
+        var plankA = isBossDoor ? "#8c2614" : PIXEL_PAL.wood;
+        var plankB = isBossDoor ? "#b83a1e" : PIXEL_PAL.woodHi;
+        var lockGlow = isBossDoor ? "#ff7a2a" : PIXEL_PAL.gold;
+
+        drawRect(ctx, door.x, door.y, door.w, door.h, frameLo);
+        drawRect(ctx, door.x + PX, door.y + PX, door.w - PX * 2, door.h - PX * 2, plankA);
         var plankStep = PX * 3;
-        for (var py = door.y + PX; py < door.y + door.h - PX; py += plankStep) {
-            drawRect(ctx, door.x + PX, py, door.w - PX * 2, PX, PIXEL_PAL.wood);
-            drawRect(ctx, door.x + PX, py + PX, door.w - PX * 2, PX, PIXEL_PAL.woodHi);
+        if (isHorizPassage) {
+            for (var py = door.y + PX; py < door.y + door.h - PX; py += plankStep) {
+                drawRect(ctx, door.x + PX, py, door.w - PX * 2, PX, plankB);
+                drawRect(ctx, door.x + PX, py + PX, door.w - PX * 2, PX, plankA);
+            }
+        } else {
+            for (var pxX = door.x + PX; pxX < door.x + door.w - PX; pxX += plankStep) {
+                drawRect(ctx, pxX, door.y + PX, PX, door.h - PX * 2, plankB);
+                drawRect(ctx, pxX + PX, door.y + PX, PX, door.h - PX * 2, plankA);
+            }
         }
-        drawRect(ctx, door.x, door.y, door.w, PX, PIXEL_PAL.woodHi);
-        drawRect(ctx, door.x, door.y + door.h - PX, door.w, PX, PIXEL_PAL.woodLo);
+        drawRect(ctx, door.x, door.y, door.w, PX, frameHi);
+        drawRect(ctx, door.x, door.y + door.h - PX, door.w, PX, frameHi);
+        drawRect(ctx, door.x, door.y, PX, door.h, frameHi);
+        drawRect(ctx, door.x + door.w - PX, door.y, PX, door.h, frameHi);
+
         var cx = Math.round(door.x + door.w / 2);
         var cy = Math.round(door.y + door.h / 2);
-        drawRect(ctx, cx - PX, cy - PX, PX * 2, PX * 2, PIXEL_PAL.goldLo);
-        drawRect(ctx, cx - PX / 2, cy - PX * 2, PX, PX * 4, PIXEL_PAL.gold);
-        if (!door.dir || door.dir === "h") {
+        drawRect(ctx, cx - PX * 2, cy - PX * 2, PX * 4, PX * 4, lockGlow);
+        drawRect(ctx, cx - PX, cy - PX, PX * 2, PX * 2, PIXEL_PAL.goldHi);
+        if (isHorizPassage) {
             drawRect(ctx, cx - PX / 2, cy + PX, PX, PX * 2, PIXEL_PAL.black);
         } else {
             drawRect(ctx, cx + PX, cy - PX / 2, PX * 2, PX, PIXEL_PAL.black);
@@ -2048,6 +2086,7 @@
         ctx.imageSmoothingEnabled = false;
         drawRect(ctx, sx - 14, sy + 2, 28, 16, PIXEL_PAL.stoneLo);
         drawRect(ctx, sx - 12, sy, 24, PX * 2, PIXEL_PAL.stone);
+        drawRect(ctx, sx - 10, sy, 20, PX, PIXEL_PAL.stoneHi);
         for (var col = -2; col <= 2; col++) {
             px(ctx, sx + col * PX * 3, sy - PX * 6, PIXEL_PAL.gold);
         }
@@ -2226,7 +2265,7 @@
         var ghost = el("score-ghost");
         if (ghost && state.personalBest > 0) {
             ghost.hidden = state.score >= state.personalBest;
-            ghost.textContent = "→ " + String(state.personalBest).padStart(4, "0");
+            ghost.textContent = "> " + String(state.personalBest).padStart(4, "0");
         }
 
         var seedEl = el("hud-seed");
@@ -2519,7 +2558,7 @@
             html += '<div class="hotbar-slot' + (hasSpell ? " has-spell has-charge" : "") + '">';
             html += '<span class="hotbar-num">' + (i + 1) + "</span>";
             html += '<span class="hotbar-name">' + escapeHtml(hasSpell ? slot : "—") + "</span>";
-            if (hasSpell) html += '<span class="hotbar-badge">●</span>';
+            if (hasSpell) html += '<span class="hotbar-badge" aria-hidden="true"></span>';
             html += "</div>";
         }
         holder.innerHTML = html;
@@ -2631,6 +2670,7 @@
                 glyph.textContent = item[0];
                 cell.appendChild(glyph);
                 var label = document.createElement("span");
+                label.className = "inv-label";
                 label.textContent = item;
                 cell.appendChild(label);
             } else {
@@ -2703,6 +2743,46 @@
         updateSpellLabel(state);
     }
 
+    function buildSpellPromptHtml(target, typed) {
+        var errors = 0;
+        var html = "";
+        var inWord = false;
+
+        for (var i = 0; i < target.length; i++) {
+            var targetCh = target.charAt(i);
+            var isSpace = targetCh === " ";
+            if (isSpace) {
+                if (inWord) {
+                    html += "</span>";
+                    inWord = false;
+                }
+            } else if (!inWord) {
+                html += '<span class="spell-word">';
+                inWord = true;
+            }
+            if (i === typed.length) {
+                html += '<span class="spell-caret" aria-hidden="true"></span>';
+            }
+            if (i < typed.length) {
+                var ch = typed.charAt(i);
+                if (ch === targetCh) {
+                    html += '<span class="ok">' + escapeHtml(ch) + "</span>";
+                } else {
+                    errors++;
+                    var errDisplay = ch === " " ? "&nbsp;" : escapeHtml(ch);
+                    html += '<span class="err">' + errDisplay + "</span>";
+                }
+            } else {
+                html += '<span class="pending">' + escapeHtml(targetCh) + "</span>";
+            }
+        }
+        if (inWord) html += "</span>";
+        if (typed.length >= target.length) {
+            html += '<span class="spell-caret" aria-hidden="true"></span>';
+        }
+        return { html: html, errors: errors };
+    }
+
     function updateSpellLabel(state) {
         var prompt = el("spell-prompt");
         var stats = el("spell-stats");
@@ -2710,27 +2790,10 @@
 
         var typed = state.spellTyped;
         var target = state.spellSentence;
-
-        var errors = 0;
-        var html = "";
-
-        for (var i = 0; i < target.length; i++) {
-            if (i < typed.length) {
-                var ch = typed.charAt(i);
-                var display = escapeHtml(ch);
-                if (ch === target.charAt(i)) {
-                    html += '<span class="ok">' + display + "</span>";
-                } else {
-                    errors++;
-                    html += '<span class="err">' + display + "</span>";
-                }
-            } else {
-                if (i === typed.length) html += '<span class="spell-caret" aria-hidden="true"></span>';
-                html += '<span class="pending">' + escapeHtml(target.charAt(i)) + "</span>";
-            }
-        }
+        var built = buildSpellPromptHtml(target, typed);
+        var errors = built.errors;
         state.spellErrors = errors;
-        prompt.innerHTML = html;
+        prompt.innerHTML = built.html;
 
         var elapsed = (performance.now() - state.spellStart) / 1000;
         var mins = Math.max(elapsed / 60, 1 / 60);
@@ -2807,13 +2870,15 @@
         var wpm = mins > 0 ? (correctChars / 5) / mins : 0;
         var acc = state.spellTyped.length > 0 ? (correctChars / state.spellTyped.length) * 100 : 100;
 
-        try {
-            var base = global.Storage.utils.stripSlot(state.username);
-            global.Storage.Players.updateStatistics(base, wpm, acc, state.spellErrors, Math.floor(elapsed));
-            if (state.username !== base) {
-                global.Storage.Players.updateStatistics(state.username, wpm, acc, state.spellErrors, Math.floor(elapsed));
-            }
-        } catch (_e) { /* ignore */ }
+        if (!state.isDebug) {
+            try {
+                var base = global.Storage.utils.stripSlot(state.username);
+                global.Storage.Players.updateStatistics(base, wpm, acc, state.spellErrors, Math.floor(elapsed));
+                if (state.username !== base) {
+                    global.Storage.Players.updateStatistics(state.username, wpm, acc, state.spellErrors, Math.floor(elapsed));
+                }
+            } catch (_e) { /* ignore */ }
+        }
 
         if (success && state.spellTargetSlot >= 0) {
             state.spellHotbar[state.spellTargetSlot] = "Fireball";
@@ -2844,7 +2909,7 @@
             var spellPts = applyTypingScore(state, SPELL_SUCCESS_SCORE);
             state.score += spellPts;
             var wpmMsg = "Grade " + grade + " · " + Math.round(wpm) + " WPM · " + Math.round(acc) + "% · +" + spellPts;
-            addFloatText(state, state.player.x, state.player.y - 36, grade, grade === "S" ? "#fff3b0" : grade === "A" ? "#6cf2a6" : grade === "B" ? "#6ec1ff" : "#a8b4cc", { scale: 1.35, vy: -48, life: 1.1 });
+            addFloatText(state, state.player.x, state.player.y - 36, grade, grade === "S" ? "#fff3b0" : grade === "A" ? "#6cf2a6" : grade === "B" ? "#ffb060" : "#c4a080", { scale: 1.35, vy: -48, life: 1.1 });
             addFloatText(state, state.player.x, state.player.y - 52, "+" + spellPts, "#ffd166", { scale: 1.1, vy: -42, life: 0.9 });
             showToast(state, "Spell loaded! · " + wpmMsg, 1600);
         } else {
@@ -3024,13 +3089,14 @@
     }
 
     function persistTypingTier(state) {
-        if (!state || !state.username) return;
+        if (!state || !state.username || state.isDebug) return;
         var tierId = getTypingTierId(state);
         state.typingTier = tierId;
         global.Storage.Players.updateTypingTier(state.username, tierId);
     }
 
     function autoSave(state) {
+        if (!state || state.isDebug) return;
         global.Storage.Players.updateSaveState(
             state.username,
             state.level,
@@ -3054,7 +3120,7 @@
         state.player.mp = PLAYER_MAX_MP;
         state.player.mpFloat = PLAYER_MAX_MP;
         spawnLevel(state);
-        if (state.level >= 3) {
+        if (state.level >= 3 && !state.isDebug) {
             // Snapshot is consulted on resume so a half-finished timed run
             // restarts from the score / inventory it had when the timer began.
             global.Storage.Players.createLevel3Snapshot(state.username, state.score, state.inventory);
@@ -3084,7 +3150,7 @@
         var actionBar = el("hud-action-bar");
         if (actionBar) actionBar.classList.remove("start-tutorial-highlight");
         if (state && state.phase === STATE_START_TUTORIAL) state.phase = STATE_PLAYING;
-        if (persist) {
+        if (persist && !(state && state.isDebug)) {
             try {
                 localStorage.setItem(START_TUTORIAL_KEY, "1");
             } catch (_e) { /* ignore */ }
@@ -3104,13 +3170,15 @@
     function gameOver(state) {
         state.phase = STATE_GAMEOVER;
 
-        var result = global.Leaderboard.addScore(state.baseUsername, state.score) || {
-            personalBest: state.personalBest,
-            newPersonalBest: false,
-        };
+        var result = state.isDebug
+            ? { personalBest: state.personalBest, newPersonalBest: false }
+            : (global.Leaderboard.addScore(state.baseUsername, state.score) || {
+                personalBest: state.personalBest,
+                newPersonalBest: false,
+            });
         state.personalBest = result.personalBest;
 
-        global.Storage.Players.resetSaveState(state.username);
+        if (!state.isDebug) global.Storage.Players.resetSaveState(state.username);
 
         var prog = getRoomProgress(state);
         var node = el("result-score"); if (node) node.textContent = String(state.score);
@@ -3121,7 +3189,7 @@
         node = el("result-best"); if (node) node.textContent = String(result.personalBest);
         var newRow = el("result-newbest-row"); if (newRow) newRow.hidden = !result.newPersonalBest;
         var coinsEarned = 0;
-        if (global.Meta) {
+        if (global.Meta && !state.isDebug) {
             coinsEarned = global.Meta.coinsFromScore(state.score);
             if (coinsEarned > 0) global.Meta.addCoins(state.baseUsername, coinsEarned);
         }
@@ -3874,7 +3942,11 @@
         // visually disconnect the corridor from the rooms it joins.
         carveDoorways(ctx, state.map);
         drawTraps(ctx, state);
-        for (var d = 0; d < state.map.doors.length; d++) drawDoor(ctx, state.map.doors[d]);
+        for (var d = 0; d < state.map.doors.length; d++) {
+            var doorObj = state.map.doors[d];
+            var isBossDoor = doorObj.fromIndex === state.map.bossIndex || doorObj.toIndex === state.map.bossIndex;
+            drawDoor(ctx, doorObj, isBossDoor);
+        }
         for (var t = 0; t < state.treasures.length; t++) {
             var tr = state.treasures[t];
             if (!roomHasPendingContent(state.map, tr.roomIndex)) drawTreasure(ctx, tr, state.animTime);
@@ -3913,7 +3985,136 @@
     var loopHandle = null;
     var currentState = null;
 
-    function start(slotUsername, role) {
+    function setupDebugRoom(state, mode) {
+        if (!state || !state.map) return;
+        var startIdx = state.map.startIndex;
+        var bossIdx = state.map.bossIndex;
+
+        function setRoomOpenAndClear(ri) {
+            state.revealedRooms[ri] = true;
+            state.visitedRooms[ri] = true;
+        }
+
+        function findDoorPair(a, b) {
+            var pair = [];
+            for (var i = 0; i < state.map.doors.length; i++) {
+                var d = state.map.doors[i];
+                if ((d.fromIndex === a && d.toIndex === b) || (d.fromIndex === b && d.toIndex === a)) {
+                    pair.push(d);
+                }
+            }
+            return pair;
+        }
+
+        function placeNearDoorway(room, door, distIn) {
+            if (!door) {
+                state.player.x = room.x + room.w / 2;
+                state.player.y = room.y + room.h / 2;
+                return;
+            }
+            if (!door.dir || door.dir === "h") {
+                var onLeft = Math.abs(door.x - room.x) < Math.abs(door.x - (room.x + room.w));
+                state.player.x = onLeft ? room.x + distIn : room.x + room.w - distIn;
+                state.player.y = room.y + room.h / 2;
+            } else {
+                var onTop = Math.abs(door.y - room.y) < Math.abs(door.y - (room.y + room.h));
+                state.player.x = room.x + room.w / 2;
+                state.player.y = onTop ? room.y + distIn : room.y + room.h - distIn;
+            }
+        }
+
+        if (mode === "shrine") {
+            var shrineIdx = -1;
+            for (var ri = 0; ri < state.map.rooms.length; ri++) {
+                if (ri === startIdx || ri === bossIdx) continue;
+                var rm = state.map.rooms[ri];
+                if (rm.pendingContent && rm.pendingContent.type === "shrine") {
+                    shrineIdx = ri;
+                    break;
+                }
+            }
+            if (shrineIdx < 0) {
+                for (var rj = 0; rj < state.map.rooms.length; rj++) {
+                    if (rj !== startIdx && rj !== bossIdx) {
+                        shrineIdx = rj;
+                        break;
+                    }
+                }
+            }
+            if (shrineIdx >= 0) {
+                var shrineRoom = state.map.rooms[shrineIdx];
+                shrineRoom.pendingContent = { type: "shrine" };
+                shrineRoom.isSecret = false;
+                var adjIdx = -1;
+                for (var di = 0; di < state.map.doors.length; di++) {
+                    var dr = state.map.doors[di];
+                    if (dr.toIndex === shrineIdx) {
+                        adjIdx = dr.fromIndex;
+                        break;
+                    }
+                }
+                if (adjIdx >= 0) {
+                    findDoorPair(adjIdx, shrineIdx).forEach(function (dd) { dd.open = true; });
+                    setRoomOpenAndClear(adjIdx);
+                }
+                spawnRoomContent(state, shrineIdx);
+                setRoomOpenAndClear(shrineIdx);
+                state.currentRoomIndex = shrineIdx;
+                state.player.x = shrineRoom.x + shrineRoom.w / 2 - 42;
+                state.player.y = shrineRoom.y + shrineRoom.h / 2;
+                updateRoomsCleared(state);
+            }
+            return;
+        }
+
+        if (mode === "boss" || mode === "boss-door") {
+            var bossRoom = state.map.rooms[bossIdx];
+            var bossEntry = null;
+            var adjToBoss = -1;
+            for (var bi = 0; bi < state.map.doors.length; bi++) {
+                var bd = state.map.doors[bi];
+                if (bd.fromIndex === bossIdx) {
+                    bossEntry = bd;
+                    adjToBoss = bd.toIndex;
+                    break;
+                }
+            }
+            if (adjToBoss >= 0) {
+                var adjRoom = state.map.rooms[adjToBoss];
+                adjRoom.pendingContent = null;
+                adjRoom.cleared = true;
+                setRoomOpenAndClear(adjToBoss);
+            }
+            var pair = adjToBoss >= 0 ? findDoorPair(adjToBoss, bossIdx) : [];
+            if (mode === "boss-door") {
+                for (var pi = 0; pi < pair.length; pi++) {
+                    if (pair[pi].fromIndex === adjToBoss) pair[pi].open = true;
+                    else pair[pi].open = false;
+                }
+                state.revealedRooms[bossIdx] = true;
+                state.currentRoomIndex = adjToBoss;
+                if (bossEntry) {
+                    state.player.x = bossEntry.x + bossEntry.w / 2 + (bossEntry.dir === "h" ? (bossEntry.x < state.map.rooms[adjToBoss].x ? 40 : -40) : 0);
+                    state.player.y = bossEntry.y + bossEntry.h / 2 + (bossEntry.dir === "v" ? (bossEntry.y < state.map.rooms[adjToBoss].y ? 40 : -40) : 0);
+                }
+            } else {
+                pair.forEach(function (dd) { dd.open = true; });
+                spawnRoomContent(state, bossIdx);
+                setRoomOpenAndClear(bossIdx);
+                state.currentRoomIndex = bossIdx;
+                placeNearDoorway(bossRoom, bossEntry, 56);
+            }
+            updateRoomsCleared(state);
+        }
+    }
+
+    function startDebug(mode) {
+        start("__debug__", "Player", { debugRoom: mode });
+    }
+
+    function start(slotUsername, role, opts) {
+        opts = opts || {};
+        var isDebug = !!opts.debugRoom;
         global.Screens.showCanvas(true);
         var canvas = el("game");
         var ctx = canvas.getContext("2d");
@@ -3923,12 +4124,17 @@
         unbindInputs(canvas);
 
         currentState = createState(slotUsername, role);
-        loadIntoState(currentState);
-        persistTypingTier(currentState);
-        if (global.Meta && currentState.player) {
-            currentState.player.tintColor = global.Meta.getPlayerColor(currentState.baseUsername);
+        currentState.isDebug = isDebug;
+        currentState.debugRoom = opts.debugRoom || "";
+        if (!isDebug) {
+            loadIntoState(currentState);
+            persistTypingTier(currentState);
+            if (global.Meta && currentState.player) {
+                currentState.player.tintColor = global.Meta.getPlayerColor(currentState.baseUsername);
+            }
         }
         spawnLevel(currentState);
+        if (isDebug) setupDebugRoom(currentState, opts.debugRoom);
         initGameAudio();
         bindInputs(currentState, canvas);
         bindTouchControls(currentState);
@@ -3946,12 +4152,14 @@
         if (!currentState.typingTier || !global.SentenceBank.TIERS[currentState.typingTier]) {
             currentState.typingTier = global.SentenceBank.getStoredTierId();
         }
-        maybeShowStartTutorial(currentState);
+        if (!isDebug) maybeShowStartTutorial(currentState);
 
         var slotSuffix = currentState.username !== currentState.baseUsername
             ? currentState.username.substring(currentState.baseUsername.length)
             : "";
-        global.Screens.setFooter(currentState.baseUsername + (slotSuffix ? " · " + slotSuffix.replace(/^_+/, "") : ""));
+        global.Screens.setFooter(isDebug
+            ? "Debug preview · " + opts.debugRoom
+            : currentState.baseUsername + (slotSuffix ? " · " + slotSuffix.replace(/^_+/, "") : ""));
 
         var last = performance.now();
         function frame(now) {
@@ -3967,7 +4175,8 @@
 
     function quitToHome(saveFirst) {
         if (!currentState) return;
-        if (saveFirst) autoSave(currentState);
+        var wasDebug = !!currentState.isDebug;
+        if (saveFirst && !wasDebug) autoSave(currentState);
         if (loopHandle) { cancelAnimationFrame(loopHandle); loopHandle = null; }
         unbindInputs(el("game"));
         var hud = el("hud");
@@ -3977,7 +4186,8 @@
         hide(el("inventory-overlay"));
         hide(el("spell-overlay"));
         dismissStartTutorial(currentState, false);
-        global.Screens.renderHome(currentState.baseUsername, currentState.role);
+        if (wasDebug) global.Screens.renderLogin();
+        else global.Screens.renderHome(currentState.baseUsername, currentState.role);
         currentState = null;
     }
 
@@ -3994,6 +4204,10 @@
         });
         replaceClickHandler("btn-retry", function () {
             hide(el("overlay-gameover"));
+            if (state.isDebug) {
+                startDebug(state.debugRoom);
+                return;
+            }
             // Reset and start again from level 1 in the same slot.
             global.Storage.Players.resetSaveState(state.username);
             start(state.username, state.role);
@@ -4056,6 +4270,10 @@
 
     function triggerQuickRetry(state) {
         hide(el("overlay-gameover"));
+        if (state.isDebug) {
+            startDebug(state.debugRoom);
+            return;
+        }
         start(state.username, state.role);
     }
 
@@ -4067,10 +4285,12 @@
 
     global.Game = {
         start: start,
+        startDebug: startDebug,
         quitToHome: quitToHome,
         getAchievements: getUnlockedAchievements,
         getDailySeed: getDailySeed,
         syncTypingTierFromStorage: syncTypingTierFromStorage,
         paintWizardPreview: paintWizardPreview,
+        buildSpellPromptHtml: buildSpellPromptHtml,
     };
 })(window);

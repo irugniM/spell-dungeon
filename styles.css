@@ -682,7 +682,26 @@ body.in-game .forge-plaque {
 }
 
 .achievement {
+    position: relative;
+    padding-left: 16px;
     font-size: 16px;
+}
+
+.achievement::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--ash-dim);
+    background: transparent;
+}
+
+.achievement.unlocked::before {
+    border-color: var(--good-bright);
+    background: var(--good);
+    box-shadow: 0 0 6px rgba(92, 188, 104, 0.5);
 }
 
 .achievement.unlocked { color: var(--good-bright); }
@@ -885,7 +904,11 @@ body.in-game .forge-plaque {
 }
 
 .slot-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
     padding: 18px 16px;
+    overflow: hidden;
     color: var(--cream);
     background: var(--rivets), linear-gradient(180deg, var(--iron-3), var(--iron-1));
     border: 3px solid var(--iron-5);
@@ -909,21 +932,29 @@ body.in-game .forge-plaque {
 .slot-title {
     display: flex;
     flex-wrap: wrap;
+    align-items: baseline;
     justify-content: space-between;
-    gap: 2px 8px;
+    gap: 4px 10px;
+    min-width: 0;
     margin-bottom: 8px;
     color: var(--ember-soft);
     font-family: var(--font-heading);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
+}
+
+.slot-title span {
+    white-space: nowrap;
 }
 
 .slot-meta {
     display: grid;
     gap: 3px;
+    min-width: 0;
     color: var(--ash);
     font-size: 16px;
+    overflow-wrap: break-word;
 }
 
 .slot-meta b {
@@ -931,7 +962,11 @@ body.in-game .forge-plaque {
     font-weight: 700;
 }
 
-.slot-tier { color: var(--ember-pale); }
+.slot-tier {
+    min-width: 0;
+    color: var(--ember-pale);
+    overflow-wrap: break-word;
+}
 .slot-tier-pending { color: var(--ash); font-size: 14px; }
 
 .stats-grid {
@@ -1871,10 +1906,13 @@ body.in-game .forge-plaque {
 
 .hotbar-badge {
     position: absolute;
-    top: 2px;
+    top: 3px;
     right: 4px;
-    color: #ffe7a0;
-    font-size: 9px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ffe7a0;
+    box-shadow: 0 0 6px var(--ember);
 }
 
 .canvas-overlays {
@@ -1907,7 +1945,7 @@ body.in-game .forge-plaque {
     grid-area: 1 / 1;
     align-self: end;
     justify-self: center;
-    margin-bottom: 170px;
+    margin-bottom: 184px;
     padding: 6px 16px;
     color: var(--ember-pale);
     background: linear-gradient(180deg, #3a2010, #1a0c08);
@@ -2288,9 +2326,15 @@ body.in-game .forge-plaque {
     font-size: 26px;
     font-weight: 500;
     line-height: 1.5;
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
     user-select: none;
+}
+
+.spell-word {
+    display: inline-block;
+    white-space: nowrap;
 }
 
 .spell-prompt .ok {
@@ -2311,6 +2355,10 @@ body.in-game .forge-plaque {
 
 .spell-caret {
     position: relative;
+    display: inline-block;
+    width: 0;
+    height: 1em;
+    vertical-align: baseline;
 }
 
 .spell-caret::after {
@@ -2423,7 +2471,7 @@ body.in-game .forge-plaque {
 }
 
 .inventory-panel {
-    width: min(620px, 100%);
+    width: min(660px, 100%);
     padding: 22px 26px;
 }
 
@@ -2449,18 +2497,28 @@ body.in-game .forge-plaque {
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     min-width: 0;
-    aspect-ratio: 1 / 1;
-    padding: 3px;
+    min-height: 78px;
+    padding: 6px 4px;
     overflow: hidden;
     color: #6a5a4e;
     background: linear-gradient(180deg, #2a2018, #0c0a08);
     border: 2px solid var(--iron-edge);
     box-shadow: inset 0 0 0 1px var(--iron-0);
-    font-size: 13px;
-    line-height: 1.1;
+    font-size: 12px;
+    line-height: 1.15;
     text-align: center;
     cursor: pointer;
+}
+
+.inv-label {
+    display: block;
+    max-width: 100%;
+    font-size: 12px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .inv-cell:hover {
@@ -2715,8 +2773,21 @@ body.in-game .forge-plaque {
         width: 46px;
         height: 46px;
     }
+    .forge-plaque {
+        display: none;
+    }
+    .overlay-title {
+        font-size: 23px;
+        letter-spacing: 0.09em;
+    }
+    .inv-label {
+        font-size: 11px;
+    }
+    .hud-bottom {
+        bottom: max(146px, calc(env(safe-area-inset-bottom, 0px) + 132px));
+    }
     .door-hint {
-        margin-bottom: 200px;
+        margin-bottom: 235px;
         max-width: 92%;
         white-space: normal;
         text-align: center;
@@ -2755,6 +2826,28 @@ body.in-game .forge-plaque {
     }
 }
 
+@media (max-width: 560px) {
+    .slots-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 430px) {
+    .hud-action-bar {
+        gap: 4px;
+        padding: 5px;
+    }
+    .hud-potion-bar,
+    .hud-hotbar {
+        gap: 2px;
+    }
+    .potion-slot,
+    .hotbar-slot {
+        width: 32px;
+        height: 40px;
+    }
+}
+
 @media (max-width: 480px) {
     .screen .home-actions {
         grid-template-columns: minmax(0, 1fr);
@@ -2767,6 +2860,12 @@ body.in-game .forge-plaque {
     .achievement-list {
         grid-template-columns: minmax(0, 1fr);
     }
+    .forge-plaque {
+        display: none;
+    }
+}
+
+@media (max-height: 740px) {
     .forge-plaque {
         display: none;
     }

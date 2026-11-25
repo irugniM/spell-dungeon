@@ -72,7 +72,7 @@
                 class: "screen-sub",
                 text: compact
                     ? "Dungeon depth auto-scales spell difficulty each level. Home tier is a baseline for new slots."
-                    : "Spell sentences get harder as you clear levels (Grade 1–6 → exam tier). Timers follow real-world typing benchmarks. Higher tiers earn more score per kill.",
+                    : "Spell sentences get harder as you clear levels (Grade 1–6 to exam tier). Timers follow real-world typing benchmarks. Higher tiers earn more score per kill.",
             }),
             pillsWrap,
             el("p", { class: "typing-tier-legend", text: bank.formatMultiplierLegend() }),
@@ -497,7 +497,7 @@
         Object.keys(allLabels).forEach(function (id) {
             var li = el("li", {
                 class: unlockedIds[id] ? "achievement unlocked" : "achievement locked",
-                text: (unlockedIds[id] ? "✓ " : "○ ") + allLabels[id],
+                text: allLabels[id],
             });
             achList.appendChild(li);
         });
