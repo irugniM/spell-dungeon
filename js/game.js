@@ -2082,19 +2082,37 @@
         var bob = Math.round(Math.sin((animTime || 0) * 3.2 + s.x * 0.01) * PX * 2);
         var sx = Math.round(s.x);
         var sy = Math.round(s.y) + bob;
+        var pulse = 0.5 + 0.5 * Math.sin((animTime || 0) * 4);
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        drawRect(ctx, sx - 14, sy + 2, 28, 16, PIXEL_PAL.stoneLo);
-        drawRect(ctx, sx - 12, sy, 24, PX * 2, PIXEL_PAL.stone);
-        drawRect(ctx, sx - 10, sy, 20, PX, PIXEL_PAL.stoneHi);
-        for (var col = -2; col <= 2; col++) {
-            px(ctx, sx + col * PX * 3, sy - PX * 6, PIXEL_PAL.gold);
-        }
-        drawRect(ctx, sx - PX, sy - PX * 8, PX * 2, PX * 2, PIXEL_PAL.goldHi);
-        var glow = 0.55 + 0.45 * Math.sin((animTime || 0) * 4);
-        ctx.globalAlpha = glow;
-        px(ctx, sx - PX * 5, sy - PX * 4, PIXEL_PAL.goldHi);
-        px(ctx, sx + PX * 4, sy - PX * 3, PIXEL_PAL.goldHi);
+        ctx.globalAlpha = 0.18 + pulse * 0.16;
+        drawRect(ctx, sx - 30, sy + 8, 60, 20, "#ff7a2a");
+        ctx.globalAlpha = 0.28 + pulse * 0.22;
+        drawRect(ctx, sx - 20, sy + 10, 40, 12, PIXEL_PAL.gold);
+        ctx.globalAlpha = 1;
+        drawRect(ctx, sx - 22, sy - 8, 44, 32, PIXEL_PAL.black);
+        drawRect(ctx, sx - 22, sy - 10, 44, 2, PIXEL_PAL.gold);
+        drawRect(ctx, sx - 22, sy + 22, 44, 2, PIXEL_PAL.goldLo);
+        drawRect(ctx, sx - 24, sy - 8, 2, 32, PIXEL_PAL.goldLo);
+        drawRect(ctx, sx + 22, sy - 8, 2, 32, PIXEL_PAL.gold);
+        drawRect(ctx, sx - 20, sy - 6, 40, 28, PIXEL_PAL.wood);
+        drawRect(ctx, sx - 18, sy - 4, 36, 24, PIXEL_PAL.woodHi);
+        drawRect(ctx, sx - 16, sy + 14, 32, 4, PIXEL_PAL.woodLo);
+        drawRect(ctx, sx - 22, sy - 14, 44, 12, "#c4a080");
+        drawRect(ctx, sx - 20, sy - 16, 40, 10, PIXEL_PAL.white);
+        drawRect(ctx, sx - 18, sy - 18, 36, 4, PIXEL_PAL.goldHi);
+        drawRect(ctx, sx - 22, sy - 18, 44, 2, PIXEL_PAL.gold);
+        ctx.globalAlpha = 0.55 + pulse * 0.4;
+        drawRect(ctx, sx - 8, sy - 28, 16, 14, "#ff7a2a");
+        ctx.globalAlpha = 1;
+        drawRect(ctx, sx - 6, sy - 32, 12, 16, PIXEL_PAL.fire);
+        drawRect(ctx, sx - 4, sy - 36, 8, 14, PIXEL_PAL.fireHi);
+        drawRect(ctx, sx - 2, sy - 38, 4, 8, PIXEL_PAL.goldHi);
+        drawRect(ctx, sx - 16, sy - 22, 6, 8, PIXEL_PAL.gold);
+        drawRect(ctx, sx + 10, sy - 22, 6, 8, PIXEL_PAL.gold);
+        ctx.globalAlpha = 0.6 + pulse * 0.4;
+        drawRect(ctx, sx - 14, sy - 28, 4, 6, PIXEL_PAL.fireHi);
+        drawRect(ctx, sx + 12, sy - 28, 4, 6, PIXEL_PAL.fireHi);
         ctx.restore();
     }
 

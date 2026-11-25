@@ -289,6 +289,46 @@ function checkNoBlueCanvas() {
             }
         }
     }
+    const shrineMatch = gameJs.match(/function drawShrine\([\s\S]*?\n    function /);
+    if (!shrineMatch) {
+        errors.push("js/game.js missing drawShrine");
+    } else {
+        const body = shrineMatch[0];
+        const pal = { white: "f4e0c4", goldHi: "fff3b0", gold: "ffd166", goldLo: "b8922e", fire: "ff8a3d", fireHi: "ffd166", fireCore: "fff8e8" };
+        const isLight = (hex) => {
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            return (r + g + b) / 3 >= 180;
+        };
+        const isEmber = (hex) => {
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            return r >= 180 && g >= 60 && b <= 120 && r > b + 40;
+        };
+        let hasLightSlab = false;
+        let hasEmberGlow = false;
+        for (const m of body.matchAll(/drawRect\(ctx,\s*[^,]+,\s*[^,]+,\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/g)) {
+            const width = Number(m[1].trim());
+            const height = Number(m[2].trim());
+            if (!Number.isFinite(width) || !Number.isFinite(height)) continue;
+            let hex = null;
+            const palRef = m[3].match(/PIXEL_PAL\.(\w+)/);
+            const lit = m[3].match(/#([0-9a-fA-F]{6})/);
+            if (palRef && pal[palRef[1]]) hex = pal[palRef[1]];
+            else if (lit) hex = lit[1];
+            if (!hex) continue;
+            if (isLight(hex) && width >= 24 && height >= 4) hasLightSlab = true;
+            if (isEmber(hex) && (width >= 32 || height >= 16)) hasEmberGlow = true;
+        }
+        if (!hasLightSlab) {
+            errors.push("drawShrine is missing a light top slab that contrasts with the floor");
+        }
+        if (!hasEmberGlow || !/globalAlpha/.test(body)) {
+            errors.push("drawShrine is missing an ember glow or outline");
+        }
+    }
     return errors;
 }
 
