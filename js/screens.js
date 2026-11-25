@@ -573,7 +573,8 @@
             ? global.Storage.Players.getOrCreate(slotName)
             : null;
         var saveState = record && record.saveState;
-        var hasData = !!(saveState && (saveState.currentScore > 0 || saveState.currentStage > 1 || (saveState.inventory && saveState.inventory.length > 0)));
+        var hasCleared = Array.isArray(saveState && saveState.clearedRooms) && saveState.clearedRooms.length > 0;
+        var hasData = !!(saveState && (saveState.currentScore > 0 || saveState.currentStage > 1 || (saveState.inventory && saveState.inventory.length > 0) || hasCleared));
 
         var title = el("div", { class: "slot-title" }, [
             el("span", { text: "Save Slot " + slot }),

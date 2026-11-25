@@ -377,6 +377,413 @@ function checkDebugRouteAndLayout() {
     return errors;
 }
 
+
+function createBrowserSandbox() {
+    const store = new Map();
+    const elements = new Map();
+    const listeners = new Map();
+    let rafId = 0;
+    const rafCallbacks = new Map();
+    let nowMs = 1000;
+
+    const makeClassList = () => {
+        const set = new Set();
+        return {
+            add(...names) { names.forEach((n) => set.add(n)); },
+            remove(...names) { names.forEach((n) => set.delete(n)); },
+            toggle(n, force) {
+                if (force === undefined) {
+                    if (set.has(n)) { set.delete(n); return false; }
+                    set.add(n); return true;
+                }
+                if (force) set.add(n); else set.delete(n);
+                return !!force;
+            },
+            contains(n) { return set.has(n); },
+        };
+    };
+
+    const noop = () => {};
+    const grad = () => ({ addColorStop: noop });
+    const makeCtx2d = () => ({
+        canvas: { width: 1280, height: 800 },
+        fillStyle: "#000",
+        strokeStyle: "#000",
+        lineWidth: 1,
+        globalAlpha: 1,
+        font: "12px monospace",
+        textAlign: "left",
+        textBaseline: "alphabetic",
+        imageSmoothingEnabled: false,
+        shadowColor: "transparent",
+        shadowBlur: 0,
+        save: noop,
+        restore: noop,
+        translate: noop,
+        scale: noop,
+        rotate: noop,
+        clearRect: noop,
+        fillRect: noop,
+        strokeRect: noop,
+        beginPath: noop,
+        closePath: noop,
+        moveTo: noop,
+        lineTo: noop,
+        arc: noop,
+        ellipse: noop,
+        rect: noop,
+        quadraticCurveTo: noop,
+        fill: noop,
+        stroke: noop,
+        clip: noop,
+        setLineDash: noop,
+        fillText: noop,
+        strokeText: noop,
+        drawImage: noop,
+        measureText: () => ({ width: 20 }),
+        createLinearGradient: grad,
+        createRadialGradient: grad,
+    });
+
+    const makeNode = (id = "") => {
+        const nodeListeners = new Map();
+        const node = {
+            id,
+            tagName: "DIV",
+            hidden: false,
+            textContent: "",
+            innerHTML: "",
+            value: "",
+            checked: false,
+            disabled: false,
+            width: 1280,
+            height: 800,
+            className: "",
+            dataset: {},
+            style: {},
+            children: [],
+            parentNode: null,
+            classList: makeClassList(),
+            getContext() { return makeCtx2d(); },
+            getBoundingClientRect() { return { left: 0, top: 0, width: 1280, height: 800 }; },
+            focus() {},
+            select() {},
+            closest() { return null; },
+            setAttribute(k, v) { node[k] = v; },
+            appendChild(child) {
+                if (child) {
+                    child.parentNode = node;
+                    node.children.push(child);
+                }
+                return child;
+            },
+            replaceChild(newChild, oldChild) {
+                const idx = node.children.indexOf(oldChild);
+                if (idx >= 0) node.children[idx] = newChild;
+                newChild.parentNode = node;
+                if (newChild.id) elements.set(newChild.id, newChild);
+                return oldChild;
+            },
+            cloneNode() {
+                const copy = makeNode(node.id);
+                copy.tagName = node.tagName;
+                copy.className = node.className;
+                copy.hidden = node.hidden;
+                return copy;
+            },
+            addEventListener(type, fn) {
+                if (!nodeListeners.has(type)) nodeListeners.set(type, []);
+                nodeListeners.get(type).push(fn);
+            },
+            removeEventListener(type, fn) {
+                const list = nodeListeners.get(type);
+                if (!list) return;
+                const idx = list.indexOf(fn);
+                if (idx >= 0) list.splice(idx, 1);
+            },
+            dispatchEvent(ev) {
+                const list = nodeListeners.get(ev.type) || [];
+                for (const fn of list) fn(ev);
+            },
+            click() {
+                node.dispatchEvent({ type: "click", target: node, preventDefault() {} });
+            },
+            querySelector() { return null; },
+            querySelectorAll() { return []; },
+        };
+        node.parentNode = {
+            replaceChild(newChild, oldChild) {
+                newChild.parentNode = this;
+                if (newChild.id) elements.set(newChild.id, newChild);
+                return oldChild;
+            },
+        };
+        if (id) elements.set(id, node);
+        return node;
+    };
+
+    const getEl = (id) => {
+        if (!elements.has(id)) makeNode(id);
+        return elements.get(id);
+    };
+
+    for (const id of [
+        "game", "minimap", "hud", "hud-rooms", "hud-seed", "hud-hp-text", "hud-hp-fill",
+        "hud-mp-text", "hud-mp-fill", "hud-level", "hud-score", "hud-timer-wrap", "hud-timer",
+        "hud-quest-list", "hud-potion-bar", "hud-hotbar", "hud-hint", "hud-action-bar",
+        "hud-toast", "door-hint", "score-ghost", "dash-cooldown", "dash-cooldown-fill",
+        "overlay-pause", "overlay-gameover", "overlay-start-tutorial", "inventory-overlay",
+        "spell-overlay", "btn-resume", "btn-save-quit", "btn-quit", "btn-retry",
+        "btn-quick-retry", "btn-back-menu", "btn-start-tutorial-dismiss", "inventory-confirm",
+        "inventory-close", "canvas-host", "canvas-wrap", "screen-host", "topbar-actions",
+        "footer-name", "result-score", "result-level", "result-rooms", "result-kills",
+        "result-combo", "result-best", "result-newbest-row", "result-coins-row", "result-coins",
+        "touch-controls", "touch-joystick", "touch-joystick-knob", "touch-fire-btn",
+    ]) {
+        getEl(id);
+    }
+
+    const sandbox = {
+        console,
+        Math,
+        Number,
+        String,
+        Array,
+        Object,
+        Date,
+        JSON,
+        Promise,
+        TextEncoder,
+        parseInt,
+        parseFloat,
+        isNaN,
+        isFinite,
+        Infinity,
+        setTimeout: () => 0,
+        clearTimeout() {},
+        requestAnimationFrame(fn) {
+            const id = ++rafId;
+            rafCallbacks.set(id, fn);
+            return id;
+        },
+        cancelAnimationFrame(id) { rafCallbacks.delete(id); },
+        performance: { now: () => nowMs },
+        localStorage: {
+            get length() { return store.size; },
+            key(i) { return [...store.keys()][i] ?? null; },
+            getItem(k) { return store.has(k) ? store.get(k) : null; },
+            setItem(k, v) { store.set(String(k), String(v)); },
+            removeItem(k) { store.delete(k); },
+            clear() { store.clear(); },
+        },
+        navigator: { maxTouchPoints: 0 },
+        matchMedia: () => ({ matches: false }),
+        location: { search: "" },
+        URLSearchParams,
+        Node: function Node() {},
+        document: {
+            readyState: "complete",
+            body: makeNode("body"),
+            getElementById: getEl,
+            querySelector: () => null,
+            querySelectorAll: () => [],
+            createElement: (tag) => {
+                const n = makeNode("");
+                n.tagName = String(tag || "div").toUpperCase();
+                return n;
+            },
+            createTextNode: (t) => ({ nodeValue: String(t || "") }),
+            addEventListener(type, fn) {
+                if (!listeners.has(type)) listeners.set(type, []);
+                listeners.get(type).push(fn);
+            },
+            removeEventListener() {},
+        },
+        addEventListener(type, fn) {
+            if (!listeners.has(type)) listeners.set(type, []);
+            listeners.get(type).push(fn);
+        },
+        removeEventListener(type, fn) {
+            const list = listeners.get(type);
+            if (!list) return;
+            const idx = list.indexOf(fn);
+            if (idx >= 0) list.splice(idx, 1);
+        },
+        window: null,
+    };
+    sandbox.window = sandbox;
+    sandbox.globalThis = sandbox;
+
+    for (const file of [
+        "js/leaderboard.js",
+        "js/sentence-banks.js",
+        "js/sentences.js",
+        "js/storage.js",
+        "js/meta.js",
+        "js/screens.js",
+        "js/game.js",
+    ]) {
+        vm.runInNewContext(read(file), sandbox, { filename: file });
+    }
+
+    const stepFrames = (count, dtMs = 50) => {
+        for (let i = 0; i < count; i++) {
+            const entries = [...rafCallbacks.entries()];
+            rafCallbacks.clear();
+            nowMs += dtMs;
+            for (const [, fn] of entries) fn(nowMs);
+        }
+    };
+
+    return { sandbox, getEl, stepFrames };
+}
+
+function checkDeathKeepsSaveSlot() {
+    const errors = [];
+    const { sandbox, getEl, stepFrames } = createBrowserSandbox();
+    const { Storage, Game, localStorage } = sandbox;
+    localStorage.setItem("spelldungeon-start-tutorial-dismissed", "1");
+
+    // Seed a level-3 run (20s timer) with progress (cleared room, score, seed, inventory)
+    Storage.Players.updateSaveState("Hero_slot1", 3, 85, ["Strength"], 450, "standard", {
+        mapSeed: 55123,
+        clearedRooms: [1],
+        safeRoomIndex: 1,
+    });
+    Storage.Players.updateLevel3TimeLimit("Hero_slot1", 20);
+
+    Game.start("Hero_slot1", "Player");
+    const beforeDeath = Game.getStateSnapshot();
+    if (!beforeDeath || beforeDeath.level !== 3 || beforeDeath.mapSeed !== 55123) {
+        errors.push(`failed to start seeded level-3 run (got ${JSON.stringify(beforeDeath)})`);
+        return errors;
+    }
+
+    // Run real frames (capped at 0.05s per frame in loop) until the 60s level-3 timer hits 0 and triggers gameOver()
+    stepFrames(420, 50);
+
+    const afterDeathSnap = Game.getStateSnapshot();
+    if (!afterDeathSnap || afterDeathSnap.phase !== "gameover") {
+        errors.push(`expected gameover phase after timer expiry, got ${afterDeathSnap && afterDeathSnap.phase}`);
+        return errors;
+    }
+    if (getEl("overlay-gameover").hidden) {
+        errors.push("#overlay-gameover remained hidden after death");
+    }
+
+    const savedAfterDeath = Storage.Players.getOrCreate("Hero_slot1").saveState;
+    if (savedAfterDeath.currentStage !== 3 || savedAfterDeath.mapSeed !== 55123) {
+        errors.push(`death wiped save slot: stage=${savedAfterDeath.currentStage}, seed=${savedAfterDeath.mapSeed}`);
+    }
+    if (!Array.isArray(savedAfterDeath.clearedRooms) || !savedAfterDeath.clearedRooms.includes(1)) {
+        errors.push(`death lost clearedRooms: ${JSON.stringify(savedAfterDeath.clearedRooms)}`);
+    }
+
+    // Both Play again (#btn-retry) and Quick retry (#btn-quick-retry) must preserve and reload the safe state
+    getEl("btn-retry").click();
+    const afterRetry = Game.getStateSnapshot();
+    if (!afterRetry || afterRetry.phase !== "playing") {
+        errors.push(`#btn-retry did not restart into playing phase (got ${afterRetry && afterRetry.phase})`);
+    }
+    if (afterRetry.level !== 3 || afterRetry.mapSeed !== 55123 || afterRetry.roomsCleared !== 1) {
+        errors.push(`#btn-retry did not restore last safe state: ${JSON.stringify(afterRetry)}`);
+    }
+    if (afterRetry.hp <= 0) {
+        errors.push(`#btn-retry restarted with non-positive hp=${afterRetry.hp}`);
+    }
+
+    Game.quitToHome(false);
+    return errors;
+}
+
+function checkClearedRoomsPersist() {
+    const errors = [];
+    const { sandbox, getEl, stepFrames } = createBrowserSandbox();
+    const { Storage, Game, localStorage } = sandbox;
+    localStorage.setItem("spelldungeon-start-tutorial-dismissed", "1");
+
+    Storage.Players.updateSaveState("Hero_slot2", 1, 90, ["Strength"], 250, "standard", {
+        mapSeed: 42199,
+        clearedRooms: [1, 2],
+        safeRoomIndex: 1,
+    });
+
+    Game.start("Hero_slot2", "Player");
+    const snap1 = Game.getStateSnapshot();
+    if (!snap1 || snap1.roomsCleared !== 2 || snap1.roomsTotal !== 4) {
+        errors.push(`expected Rooms 2/4 on reload, got ${snap1 && snap1.roomsCleared}/${snap1 && snap1.roomsTotal}`);
+    }
+    if (snap1 && snap1.safeRoomIndex !== 1) {
+        errors.push(`expected safeRoomIndex=1 on reload, got ${snap1.safeRoomIndex}`);
+    }
+    Game.quitToHome(true);
+
+    const persisted = Storage.Players.getOrCreate("Hero_slot2").saveState;
+    if (!Array.isArray(persisted.clearedRooms) || persisted.clearedRooms.length !== 2) {
+        errors.push(`quitToHome(true) did not persist clearedRooms: ${JSON.stringify(persisted.clearedRooms)}`);
+    }
+
+    Game.start("Hero_slot2", "Player");
+    stepFrames(1, 16);
+    const snap2 = Game.getStateSnapshot();
+    if (!snap2 || snap2.roomsCleared !== 2) {
+        errors.push(`second reload lost cleared rooms: ${snap2 && snap2.roomsCleared}`);
+    }
+    if (getEl("hud-rooms").textContent !== "Rooms 2/4") {
+        errors.push(`HUD rooms text expected "Rooms 2/4", got "${getEl("hud-rooms").textContent}"`);
+    }
+    Game.quitToHome(false);
+
+    // Old save compatibility (no mapSeed, clearedRooms, safeRoomIndex)
+    const playersRaw = JSON.parse(localStorage.getItem("spell-dungeon::players::v1"));
+    playersRaw.players.push({
+        username: "Legacy_slot1",
+        statistics: { Wpm: 40, accuracyPercentage: 90, errorCount: 2, totalTimePlayed: 20 },
+        saveState: { currentStage: 2, currentHealth: 80, inventory: ["Health"], currentScore: 500, level3TimeLimit: 60 },
+    });
+    localStorage.setItem("spell-dungeon::players::v1", JSON.stringify(playersRaw));
+
+    Game.start("Legacy_slot1", "Player");
+    const legacySnap = Game.getStateSnapshot();
+    if (!legacySnap || legacySnap.level !== 2 || legacySnap.score !== 500 || !legacySnap.mapSeed) {
+        errors.push(`old save failed to load cleanly: ${JSON.stringify(legacySnap)}`);
+    }
+    Game.quitToHome(false);
+    return errors;
+}
+
+function checkMapSeedPersists() {
+    const errors = [];
+    const { sandbox } = createBrowserSandbox();
+    const { Storage, Game, localStorage } = sandbox;
+    localStorage.setItem("spelldungeon-start-tutorial-dismissed", "1");
+
+    Game.start("Hero_slot3", "Player");
+    const snap1 = Game.getStateSnapshot();
+    if (!snap1 || !snap1.mapSeed) {
+        errors.push("fresh run did not assign mapSeed");
+        return errors;
+    }
+    const storedSeed = Storage.Players.getOrCreate("Hero_slot3").saveState.mapSeed;
+    if (storedSeed !== snap1.mapSeed) {
+        errors.push(`stored mapSeed (${storedSeed}) != live mapSeed (${snap1.mapSeed})`);
+    }
+    Game.quitToHome(true);
+
+    Game.start("Hero_slot3", "Player");
+    const snap2 = Game.getStateSnapshot();
+    if (!snap2 || snap2.mapSeed !== snap1.mapSeed) {
+        errors.push(`mapSeed changed on reload: ${snap1.mapSeed} -> ${snap2 && snap2.mapSeed}`);
+    }
+    const layout1 = JSON.stringify({ rooms: snap1.rooms.map((r) => [r.index, r.col, r.row]), edges: snap1.edges, s: snap1.startIndex, b: snap1.bossIndex });
+    const layout2 = JSON.stringify({ rooms: snap2.rooms.map((r) => [r.index, r.col, r.row]), edges: snap2.edges, s: snap2.startIndex, b: snap2.bossIndex });
+    if (layout1 !== layout2) {
+        errors.push(`maze geometry changed on reload for seed ${snap1.mapSeed}: ${layout1} vs ${layout2}`);
+    }
+    Game.quitToHome(false);
+    return errors;
+}
+
 const checks = [
     ["a. no emoji in text files", checkEmoji],
     ["b. localStorage keys unchanged", checkStorageKeys],
@@ -389,6 +796,9 @@ const checks = [
     ["i. no blue/navy canvas colours left", checkNoBlueCanvas],
     ["j. no unsupported font glyphs in UI", checkFontGlyphs],
     ["k. debug route and layout guards", checkDebugRouteAndLayout],
+    ["l. dying keeps save slot and restarts from last safe state", checkDeathKeepsSaveSlot],
+    ["m. cleared rooms persist and restore across save/reload", checkClearedRoomsPersist],
+    ["n. maze seed persists and rebuilds identical maze on reload", checkMapSeedPersists],
 ];
 
 let failed = 0;

@@ -101,6 +101,9 @@
             snapshotScore: 0,
             snapshotInventory: [],
             typingTier: null,
+            mapSeed: null,
+            clearedRooms: [],
+            safeRoomIndex: null,
         };
     }
 
@@ -290,6 +293,19 @@
         if (typeof ss.snapshotScore !== "number") ss.snapshotScore = 0;
         if (!Array.isArray(ss.snapshotInventory)) ss.snapshotInventory = [];
         if (ss.typingTier != null && typeof ss.typingTier !== "string") ss.typingTier = null;
+        if (ss.mapSeed != null && (typeof ss.mapSeed !== "number" || !isFinite(ss.mapSeed) || ss.mapSeed <= 0)) {
+            ss.mapSeed = null;
+        }
+        if (!Array.isArray(ss.clearedRooms)) {
+            ss.clearedRooms = [];
+        } else {
+            ss.clearedRooms = ss.clearedRooms
+                .filter(function (idx) { return typeof idx === "number" && isFinite(idx) && idx >= 0; })
+                .map(function (idx) { return idx | 0; });
+        }
+        if (ss.safeRoomIndex != null && (typeof ss.safeRoomIndex !== "number" || !isFinite(ss.safeRoomIndex) || ss.safeRoomIndex < 0)) {
+            ss.safeRoomIndex = null;
+        }
         return record;
     }
 
@@ -344,7 +360,7 @@
         savePlayerData(player);
     }
 
-    function updateSaveState(username, currentStage, currentHealth, inventory, currentScore, typingTier) {
+    function updateSaveState(username, currentStage, currentHealth, inventory, currentScore, typingTier, extra) {
         var player = getOrCreatePlayerData(username);
         if (!player) return;
         player.saveState.currentStage = currentStage;
@@ -353,6 +369,21 @@
         player.saveState.currentScore = currentScore;
         if (typingTier != null && typeof typingTier === "string" && typingTier) {
             player.saveState.typingTier = typingTier;
+        }
+        if (extra && typeof extra === "object") {
+            if ("mapSeed" in extra) {
+                player.saveState.mapSeed = (typeof extra.mapSeed === "number" && isFinite(extra.mapSeed) && extra.mapSeed > 0)
+                    ? Math.floor(extra.mapSeed)
+                    : null;
+            }
+            if ("clearedRooms" in extra) {
+                player.saveState.clearedRooms = Array.isArray(extra.clearedRooms) ? extra.clearedRooms.slice() : [];
+            }
+            if ("safeRoomIndex" in extra) {
+                player.saveState.safeRoomIndex = (typeof extra.safeRoomIndex === "number" && isFinite(extra.safeRoomIndex) && extra.safeRoomIndex >= 0)
+                    ? (extra.safeRoomIndex | 0)
+                    : null;
+            }
         }
         savePlayerData(player);
     }
