@@ -480,16 +480,17 @@
         return mult;
     }
 
-    function generateRoomTraps(room) {
+    function generateRoomTraps(room, rngFn) {
+        var r = typeof rngFn === "function" ? rngFn : Math.random;
         var traps = [];
-        if (Math.random() > 0.32) return traps;
-        var count = 2 + Math.floor(Math.random() * 3);
+        if (r() > 0.32) return traps;
+        var count = 2 + Math.floor(r() * 3);
         for (var i = 0; i < count; i++) {
             traps.push({
-                x: rand(room.x + 48, room.x + room.w - 80),
-                y: rand(room.y + 48, room.y + room.h - 80),
-                w: rand(36, 56),
-                h: rand(28, 44),
+                x: room.x + 48 + r() * ((room.w - 80) - 48),
+                y: room.y + 48 + r() * ((room.h - 80) - 48),
+                w: 36 + r() * 20,
+                h: 28 + r() * 16,
                 roomIndex: room.index,
             });
         }
@@ -645,13 +646,20 @@
 
     function checkRoomClearCelebration(state) {
         if (!state.map || !state._roomWasCleared) return;
+        var newlyCleared = false;
         for (var i = 0; i < state.map.rooms.length; i++) {
             if (i === state.map.startIndex) continue;
             var room = state.map.rooms[i];
             var was = !!state._roomWasCleared[i];
             var now = !!room.cleared;
             state._roomWasCleared[i] = now;
-            if (!was && now) celebrateRoomClear(state);
+            if (!was && now) {
+                celebrateRoomClear(state);
+                newlyCleared = true;
+            }
+        }
+        if (newlyCleared && !state.isDebug) {
+            autoSave(state);
         }
     }
 
@@ -735,7 +743,17 @@
      * @param {number} level   current game level (affects room count)
      * @returns {{ rooms, corridors, doors, startIndex, bossIndex }}
      */
-    function buildLevel(level) {
+    function createSeededRng(seed) {
+        var t = (seed >>> 0) || 1;
+        return function () {
+            t = (t + 0x6D2B79F5) | 0;
+            var x = Math.imul(t ^ (t >>> 15), 1 | t);
+            x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+            return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    function buildLevel(level, seedOverride) {
         var COLS = 3, ROWS = 3;
         var ROOM_W  = 20 * TILE;   // all rooms fixed size for clean alignment
         var ROOM_H  = 14 * TILE;
@@ -743,6 +761,10 @@
         var CELL_W  = ROOM_W + CORR_LEN;
         var CELL_H  = ROOM_H + CORR_LEN;
         var DOOR_TH = 14;          // door thickness in pixels
+        var seed = (typeof seedOverride === "number" && isFinite(seedOverride) && seedOverride > 0)
+            ? Math.floor(seedOverride)
+            : (10000 + Math.floor(Math.random() * 90000));
+        var rng = createSeededRng(seed);
 
         // Number of rooms scales with level: 4 on level 1, up to 9 on level 5+
         var roomCount = Math.max(4, Math.min(4 + Math.floor((level + 1) / 2), COLS * ROWS));
@@ -750,8 +772,8 @@
         // ---- grow cells from a random starting cell ----
         var occupied = {};
         var cellList = [];
-        var sc = Math.floor(Math.random() * COLS);
-        var sr = Math.floor(Math.random() * ROWS);
+        var sc = Math.floor(rng() * COLS);
+        var sr = Math.floor(rng() * ROWS);
         occupied[sr + ',' + sc] = 0;
         cellList.push({ col: sc, row: sr });
 
@@ -770,7 +792,7 @@
                 }
             }
             if (frontier.length === 0) break;
-            var pick = frontier[Math.floor(Math.random() * frontier.length)];
+            var pick = frontier[Math.floor(rng() * frontier.length)];
             occupied[pick.row + ',' + pick.col] = cellList.length;
             cellList.push({ col: pick.col, row: pick.row });
         }
@@ -807,7 +829,7 @@
                 var key = Math.min(rm.index, nb.index) + '_' + Math.max(rm.index, nb.index);
                 if (!edgeSeen[key]) {
                     edgeSeen[key] = true;
-                    allEdges.push({ from: rm.index, to: nb.index, w: Math.random() });
+                    allEdges.push({ from: rm.index, to: nb.index, w: rng() });
                 }
             });
         }
@@ -828,8 +850,8 @@
         }
 
         // Optionally add one loop edge (~40% chance)
-        if (extras.length > 0 && Math.random() < 0.4) {
-            mst.push(extras[Math.floor(Math.random() * extras.length)]);
+        if (extras.length > 0 && rng() < 0.4) {
+            mst.push(extras[Math.floor(rng() * extras.length)]);
         }
 
         // ---- build corridors + doors from selected edges ----
@@ -896,8 +918,6 @@
         var edges = mst.map(function (edge) {
             return { from: edge.from, to: edge.to };
         });
-
-        var seed = 10000 + Math.floor(Math.random() * 90000);
 
         return { rooms: rooms, corridors: corridors, doors: doors, edges: edges,
                  startIndex: startIndex, bossIndex: bossIndex,
@@ -1279,7 +1299,12 @@
      * The start room gets no pending content and is marked cleared immediately.
      */
     function spawnLevel(state) {
-        state.map = buildLevel(state.level);
+        var seedToUse = (typeof state.pendingMapSeed === "number" && isFinite(state.pendingMapSeed) && state.pendingMapSeed > 0)
+            ? state.pendingMapSeed
+            : null;
+        state.pendingMapSeed = null;
+        state.map = buildLevel(state.level, seedToUse);
+        var roomRng = createSeededRng(state.map.seed + 1013);
         state.enemies = [];
         state.treasures = [];
         state.fireballs = [];
@@ -1295,11 +1320,6 @@
         var pickupIdx = 0;
         var secretRoom = -1;
         var secretCandidates = [];
-
-        // Place player in start room centre
-        var startRoom = state.map.rooms[startIdx];
-        state.player.x = startRoom.x + startRoom.w / 2;
-        state.player.y = startRoom.y + startRoom.h / 2;
 
         // Assign pending content to every room
         for (var ri = 0; ri < state.map.rooms.length; ri++) {
@@ -1317,18 +1337,18 @@
                     bossHp:      Math.round(160 * hpMult * BOSS_HP_MULT),
                     bossSpeed:   80 * speedMult,
                 };
-            } else if (Math.random() < 0.65) {
+            } else if (roomRng() < 0.65) {
                 room.pendingContent = {
                     type:  'enemies',
-                    count: 2 + Math.floor(Math.random() * (2 + Math.min(state.level - 1, 2))),
+                    count: 2 + Math.floor(roomRng() * (2 + Math.min(state.level - 1, 2))),
                     hp:    Math.round(60 * hpMult),
                     speed: 90 * speedMult,
                 };
                 secretCandidates.push(ri);
-            } else if (Math.random() < SHRINE_ROOM_CHANCE) {
+            } else if (roomRng() < SHRINE_ROOM_CHANCE) {
                 room.pendingContent = { type: "shrine" };
             } else {
-                var numPotions = Math.random() < 0.4 ? 2 : 1;
+                var numPotions = roomRng() < 0.4 ? 2 : 1;
                 var items = [];
                 for (var p = 0; p < numPotions; p++) {
                     items.push(pickups[pickupIdx % pickups.length]);
@@ -1338,8 +1358,8 @@
             }
         }
 
-        if (secretCandidates.length > 0 && Math.random() < SECRET_ROOM_CHANCE) {
-            secretRoom = secretCandidates[Math.floor(Math.random() * secretCandidates.length)];
+        if (secretCandidates.length > 0 && roomRng() < SECRET_ROOM_CHANCE) {
+            secretRoom = secretCandidates[Math.floor(roomRng() * secretCandidates.length)];
             state.map.rooms[secretRoom].isSecret = true;
         }
 
@@ -1348,17 +1368,47 @@
             if (tri === startIdx) continue;
             var trapRoom = state.map.rooms[tri];
             if (trapRoom.pendingContent && trapRoom.pendingContent.type === "enemies") {
-                var roomTraps = generateRoomTraps(trapRoom);
+                var roomTraps = generateRoomTraps(trapRoom, roomRng);
                 for (var tt = 0; tt < roomTraps.length; tt++) state.map.traps.push(roomTraps[tt]);
             }
         }
 
-        for (var d = 0; d < state.map.doors.length; d++) state.map.doors[d].open = false;
+        var savedCleared = state.pendingClearedRooms;
+        state.pendingClearedRooms = null;
+        if (Array.isArray(savedCleared) && savedCleared.length > 0) {
+            for (var sci = 0; sci < savedCleared.length; sci++) {
+                var clearedIdx = savedCleared[sci] | 0;
+                if (state.map.rooms[clearedIdx]) {
+                    state.map.rooms[clearedIdx].cleared = true;
+                    state.map.rooms[clearedIdx].pendingContent = null;
+                }
+            }
+        }
 
         initExploration(state);
-        state.visitedRooms[startIdx] = true;
-        state.revealedRooms[startIdx] = true;
-        state.currentRoomIndex = startIdx;
+        for (var exi = 0; exi < state.map.rooms.length; exi++) {
+            if (state.map.rooms[exi].cleared) {
+                state.visitedRooms[exi] = true;
+                state.revealedRooms[exi] = true;
+            }
+        }
+        for (var d = 0; d < state.map.doors.length; d++) {
+            var dr = state.map.doors[d];
+            dr.open = !!(state.map.rooms[dr.fromIndex].cleared && state.map.rooms[dr.toIndex].cleared);
+        }
+
+        var spawnRoomIdx = startIdx;
+        if (typeof state.pendingSafeRoomIndex === "number" &&
+            state.map.rooms[state.pendingSafeRoomIndex] &&
+            state.map.rooms[state.pendingSafeRoomIndex].cleared) {
+            spawnRoomIdx = state.pendingSafeRoomIndex;
+        }
+        state.pendingSafeRoomIndex = null;
+        var spawnRoom = state.map.rooms[spawnRoomIdx];
+        state.player.x = spawnRoom.x + spawnRoom.w / 2;
+        state.player.y = spawnRoom.y + spawnRoom.h / 2;
+        state.currentRoomIndex = spawnRoomIdx;
+        state.safeRoomIndex = spawnRoomIdx;
         state.bossIntroShown = false;
         state._roomWasCleared = {};
         for (var ri2 = 0; ri2 < state.map.rooms.length; ri2++) {
@@ -1508,6 +1558,20 @@
 
     /** Opens the door (and its mirror) and spawns content in the room being entered. */
     function openDoorPair(state, door) {
+        if (!state.isDebug && state.map) {
+            var safeIdx = -1;
+            if (state.currentRoomIndex >= 0 && state.map.rooms[state.currentRoomIndex] && state.map.rooms[state.currentRoomIndex].cleared) {
+                safeIdx = state.currentRoomIndex;
+            } else if (state.map.rooms[door.fromIndex] && state.map.rooms[door.fromIndex].cleared) {
+                safeIdx = door.fromIndex;
+            } else if (state.map.rooms[door.toIndex] && state.map.rooms[door.toIndex].cleared) {
+                safeIdx = door.toIndex;
+            }
+            if (safeIdx >= 0) {
+                state.safeRoomIndex = safeIdx;
+                autoSave(state);
+            }
+        }
         door.open = true;
         door.flashTimer = 0.45;
         playSfx("door");
@@ -3030,6 +3094,10 @@
             visitedRooms: {},
             revealedRooms: {},
             currentRoomIndex: -1,
+            safeRoomIndex: null,
+            pendingMapSeed: null,
+            pendingClearedRooms: null,
+            pendingSafeRoomIndex: null,
             floatTexts: [],
             particles: [],
             levelFlash: 0,
@@ -3078,15 +3146,43 @@
         }
     }
 
+    function collectClearedRooms(state) {
+        if (!state || !state.map || !Array.isArray(state.map.rooms)) return [];
+        var out = [];
+        for (var i = 0; i < state.map.rooms.length; i++) {
+            if (i !== state.map.startIndex && state.map.rooms[i].cleared) out.push(i);
+        }
+        return out;
+    }
+
+    function computeSafeRoomIndex(state) {
+        if (!state || !state.map || !Array.isArray(state.map.rooms)) return null;
+        var rooms = state.map.rooms;
+        if (state.currentRoomIndex >= 0 && rooms[state.currentRoomIndex] && rooms[state.currentRoomIndex].cleared) {
+            return state.currentRoomIndex;
+        }
+        if (typeof state.safeRoomIndex === "number" && rooms[state.safeRoomIndex] && rooms[state.safeRoomIndex].cleared) {
+            return state.safeRoomIndex;
+        }
+        return state.map.startIndex;
+    }
+
     function loadIntoState(state) {
         var record = global.Storage.Players.getOrCreate(state.username);
         var ss = record && record.saveState ? record.saveState : global.Storage.utils.defaultSaveState();
         state.level = Math.max(1, ss.currentStage | 0);
         state.score = Math.max(0, ss.currentScore | 0);
         state.player = makePlayer(ss.currentHealth);
+        state.pendingMapSeed = (typeof ss.mapSeed === "number" && isFinite(ss.mapSeed) && ss.mapSeed > 0)
+            ? Math.floor(ss.mapSeed)
+            : null;
+        state.pendingClearedRooms = Array.isArray(ss.clearedRooms) ? ss.clearedRooms.slice() : [];
+        state.pendingSafeRoomIndex = (typeof ss.safeRoomIndex === "number" && isFinite(ss.safeRoomIndex) && ss.safeRoomIndex >= 0)
+            ? (ss.safeRoomIndex | 0)
+            : null;
 
         var savedInventory = Array.isArray(ss.inventory) ? ss.inventory : [];
-        var freshRun = state.level === 1 && state.score === 0 && savedInventory.length === 0;
+        var freshRun = state.level === 1 && state.score === 0 && savedInventory.length === 0 && state.pendingClearedRooms.length === 0;
         state.isFreshRun = freshRun;
         state.inventory = freshRun ? defaultInventory() : ensureInventoryShape(savedInventory);
         state.level3TimeLimit = ss.level3TimeLimit > 0 ? ss.level3TimeLimit : LEVEL3_BASE_TIME;
@@ -3115,21 +3211,21 @@
 
     function autoSave(state) {
         if (!state || state.isDebug) return;
+        var safeRoom = computeSafeRoomIndex(state);
+        if (safeRoom != null) state.safeRoomIndex = safeRoom;
         global.Storage.Players.updateSaveState(
             state.username,
             state.level,
             Math.max(1, Math.round(state.player.hp)),
             state.inventory,
             state.score,
-            getTypingTierId(state)
-        );
-        if (state.map && state.map.seed) {
-            var player = global.Storage.Players.getOrCreate(state.username);
-            if (player && player.saveState) {
-                player.saveState.mapSeed = state.map.seed;
-                global.Storage.Players.save(player);
+            getTypingTierId(state),
+            {
+                mapSeed: state.map && state.map.seed ? state.map.seed : null,
+                clearedRooms: collectClearedRooms(state),
+                safeRoomIndex: safeRoom,
             }
-        }
+        );
     }
 
     function advanceLevel(state) {
@@ -3196,7 +3292,7 @@
             });
         state.personalBest = result.personalBest;
 
-        if (!state.isDebug) global.Storage.Players.resetSaveState(state.username);
+
 
         var prog = getRoomProgress(state);
         var node = el("result-score"); if (node) node.textContent = String(state.score);
@@ -4153,6 +4249,7 @@
         }
         spawnLevel(currentState);
         if (isDebug) setupDebugRoom(currentState, opts.debugRoom);
+        else autoSave(currentState);
         initGameAudio();
         bindInputs(currentState, canvas);
         bindTouchControls(currentState);
@@ -4226,8 +4323,6 @@
                 startDebug(state.debugRoom);
                 return;
             }
-            // Reset and start again from level 1 in the same slot.
-            global.Storage.Players.resetSaveState(state.username);
             start(state.username, state.role);
         });
         replaceClickHandler("btn-quick-retry", function () {
@@ -4310,5 +4405,28 @@
         syncTypingTierFromStorage: syncTypingTierFromStorage,
         paintWizardPreview: paintWizardPreview,
         buildSpellPromptHtml: buildSpellPromptHtml,
+        getStateSnapshot: function () {
+            if (!currentState) return null;
+            var prog = getRoomProgress(currentState);
+            return {
+                username: currentState.username,
+                level: currentState.level,
+                score: currentState.score,
+                hp: currentState.player ? currentState.player.hp : 0,
+                phase: currentState.phase,
+                mapSeed: currentState.map ? currentState.map.seed : null,
+                startIndex: currentState.map ? currentState.map.startIndex : -1,
+                bossIndex: currentState.map ? currentState.map.bossIndex : -1,
+                rooms: currentState.map ? currentState.map.rooms.map(function (r) {
+                    return { index: r.index, col: r.col, row: r.row, cleared: !!r.cleared };
+                }) : [],
+                edges: currentState.map && currentState.map.edges ? currentState.map.edges.slice() : [],
+                clearedRooms: collectClearedRooms(currentState),
+                roomsCleared: prog.cleared,
+                roomsTotal: prog.total,
+                safeRoomIndex: currentState.safeRoomIndex,
+                currentRoomIndex: currentState.currentRoomIndex,
+            };
+        },
     };
 })(window);
